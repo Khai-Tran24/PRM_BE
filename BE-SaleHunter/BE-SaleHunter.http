@@ -1,0 +1,6 @@
+@BE_SaleHunter_HostAddress = http://localhost:5140
+
+GET {{BE_SaleHunter_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
