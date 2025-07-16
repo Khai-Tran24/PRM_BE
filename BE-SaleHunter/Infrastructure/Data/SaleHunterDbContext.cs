@@ -131,7 +131,7 @@ namespace BE_SaleHunter.Infrastructure.Data
                 entity.HasOne(uf => uf.User)
                     .WithMany(u => u.Favorites)
                     .HasForeignKey(uf => uf.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasOne(uf => uf.Product)
                     .WithMany(p => p.Favorites)
@@ -150,7 +150,7 @@ namespace BE_SaleHunter.Infrastructure.Data
                 entity.HasOne(pv => pv.User)
                     .WithMany(u => u.ProductViews)
                     .HasForeignKey(pv => pv.UserId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasOne(pv => pv.Product)
                     .WithMany(p => p.Views)

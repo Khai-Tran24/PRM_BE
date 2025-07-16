@@ -82,8 +82,8 @@ Log.Information("SERVICE REGISTRATION - Configuring Entity Framework with connec
     connectionString?.Substring(0, Math.Min(50, connectionString.Length)) + "...");
 
 builder.Services.AddDbContext<SaleHunterDbContext>(options =>
-    options.UseNpgsql(connectionString));
-Log.Information("SERVICE REGISTRATION - Entity Framework with PostgreSQL registered");
+    options.UseSqlServer(connectionString));
+Log.Information("SERVICE REGISTRATION - Entity Framework with SQL Server registered");
 
 // Configure JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new ArgumentNullException("Jwt:Key configuration is required");
