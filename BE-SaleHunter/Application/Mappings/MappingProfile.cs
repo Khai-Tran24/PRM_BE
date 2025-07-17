@@ -19,7 +19,7 @@ namespace BE_SaleHunter.Application.Mappings
                 .ForMember(dest => dest.StoreName, opt => opt.MapFrom(src => src.Store.Name))
                 .ForMember(dest => dest.StoreImageUrl, opt => opt.MapFrom(src => src.Store.LogoUrl))
                 .ForMember(dest => dest.CurrentPrice, opt => opt.MapFrom(src => src.Price))
-                .ForMember(dest => dest.DiscountedPrice, opt => opt.Ignore()) // Not available in entity
+                .ForMember(dest => dest.SalePercent, opt => opt.MapFrom(src => src.SalePercent)) // Not available in entity
                 .ForMember(dest => dest.AverageRating, opt => opt.MapFrom(src => 
                     src.Ratings.Any() ? src.Ratings.Average(r => r.Rating) : 0))
                 .ForMember(dest => dest.RatingCount, opt => opt.MapFrom(src => src.Ratings.Count))

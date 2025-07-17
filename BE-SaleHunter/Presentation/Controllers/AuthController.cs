@@ -13,11 +13,12 @@ namespace BE_SaleHunter.Presentation.Controllers
     {
         private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
-
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        private readonly IEmailService _emailService;
+        public AuthController(IAuthService authService, ILogger<AuthController> logger, IEmailService emailService)
         {
             _authService = authService;
             _logger = logger;
+            _emailService = emailService;
         }
 
         /// <summary>
@@ -198,6 +199,30 @@ namespace BE_SaleHunter.Presentation.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in reset password endpoint");
+                return StatusCode(500, BaseResponseDto<bool>.Failure("Internal server error"));
+            }
+        }
+
+        /// <summary>
+        /// Verify reset token validity
+        /// </summary>
+        [HttpPost("verify-token")]
+        public async Task<ActionResult<BaseResponseDto<bool>>> VerifyToken([FromBody] VerifyTokenRequestDto request)
+        {
+            try
+            {
+                var result = await _authService.VerifyResetTokenAsync(request.Token);
+                
+                if (result.IsSuccess)
+                {
+                    return Ok(result);
+                }
+                
+                return BadRequest(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in verify token endpoint");
                 return StatusCode(500, BaseResponseDto<bool>.Failure("Internal server error"));
             }
         }

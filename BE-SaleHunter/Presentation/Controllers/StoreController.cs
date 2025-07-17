@@ -24,6 +24,7 @@ namespace BE_SaleHunter.Presentation.Controllers
         /// Create a new store (Authenticated users only)
         /// </summary>        [HttpPost]
         [Authorize]
+        [HttpPost]
         public async Task<ActionResult<BaseResponseDto<StoreDto>>> CreateStore([FromBody] CreateStoreDto createStoreDto)
         {
             _logger.LogInformation("CreateStore request received - User: {UserId}, Store Name: {StoreName}, Category: {Category}", 
@@ -86,7 +87,7 @@ namespace BE_SaleHunter.Presentation.Controllers
         /// Get current user's store
         /// </summary>
         [HttpGet("my-store")]
-        [Authorize]
+        [Authorize(Policy = "Owner")]
         public async Task<ActionResult<BaseResponseDto<StoreDto>>> GetMyStore()
         {
             try
@@ -117,12 +118,11 @@ namespace BE_SaleHunter.Presentation.Controllers
         /// Update store (Store owner only)
         /// </summary>
         [HttpPut("{id}")]
-        [Authorize]        public async Task<ActionResult<BaseResponseDto<StoreDto>>> UpdateStore(long id,
-            [FromBody] UpdateStoreDto updateStoreDto)
+        [Authorize(Policy = "Owner")]        
+        public async Task<ActionResult<BaseResponseDto<StoreDto>>> UpdateStore(long id, [FromBody] UpdateStoreDto updateStoreDto)
         {
             _logger.LogInformation("UpdateStore request received - StoreId: {StoreId}, UserId: {UserId}, UpdateFields: {@UpdateFields}", 
                 id, User.FindFirst(ClaimTypes.NameIdentifier)?.Value, updateStoreDto);
-            
             try
             {
                 var userId = GetCurrentUserId();
@@ -156,7 +156,7 @@ namespace BE_SaleHunter.Presentation.Controllers
         /// Delete store (Store owner only)
         /// </summary>
         [HttpDelete("{id}")]
-        [Authorize]
+        [Authorize("Owner")]
         public async Task<ActionResult<BaseResponseDto<bool>>> DeleteStore(long id)
         {
             try
@@ -209,7 +209,7 @@ namespace BE_SaleHunter.Presentation.Controllers
 
         /// <summary>
         /// Search stores by name or location
-        /// </summary>        [HttpGet("search")]
+        [HttpGet("search")]
         public async Task<ActionResult<BaseResponseDto<IEnumerable<StoreDto>>>> SearchStores(
             [FromQuery] string query,
             [FromQuery] decimal? latitude = null,

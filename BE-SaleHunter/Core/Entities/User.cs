@@ -35,6 +35,8 @@ namespace BE_SaleHunter.Core.Entities
         public string? PasswordResetToken { get; set; }
         public DateTime? PasswordResetTokenExpiry { get; set; }        
         public long? StoreId { get; set; }
+        [Required]
+        public string Role { get; set; } 
 
         // Navigation properties
         public virtual Store? Store { get; set; }

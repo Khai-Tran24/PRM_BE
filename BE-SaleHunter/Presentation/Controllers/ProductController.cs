@@ -171,7 +171,7 @@ namespace BE_SaleHunter.Presentation.Controllers
         /// </summary>
         [HttpGet("search")]
         public async Task<ActionResult<BaseResponseDto<IEnumerable<ProductDto>>>> SearchProducts(
-            [FromQuery] string query,
+            [FromQuery] string query = null,
             [FromQuery] long? storeId = null,
             [FromQuery] string? category = null,
             [FromQuery] decimal? minPrice = null,
@@ -371,6 +371,61 @@ namespace BE_SaleHunter.Presentation.Controllers
             {
                 _logger.LogError(ex, "Error getting product ratings: {ProductId}", id);
                 return StatusCode(500, BaseResponseDto<IEnumerable<ProductRatingDto>>.Failure("Internal server error"));
+            }
+        }
+
+        /// <summary>
+        /// Get recommended products for user
+        /// </summary>
+        [HttpGet("recommended")]
+        [Authorize]
+        public async Task<ActionResult<BaseResponseDto<IEnumerable<ProductDto>>>> GetRecommendedProducts()
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    return BadRequest(BaseResponseDto<IEnumerable<ProductDto>>.Failure("Invalid user"));
+                }
+
+                var result = await _productService.GetRecommendedProductsAsync(userId.Value);
+                
+                if (result.IsSuccess)
+                {
+                    return Ok(result);
+                }
+                
+                return BadRequest(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting recommended products");
+                return StatusCode(500, BaseResponseDto<IEnumerable<ProductDto>>.Failure("Internal server error"));
+            }
+        }
+
+        /// <summary>
+        /// Get products currently on sale
+        /// </summary>
+        [HttpGet("on-sale")]
+        public async Task<ActionResult<BaseResponseDto<IEnumerable<ProductDto>>>> GetOnSaleProducts()
+        {
+            try
+            {
+                var result = await _productService.GetOnSaleProductsAsync();
+                
+                if (result.IsSuccess)
+                {
+                    return Ok(result);
+                }
+                
+                return BadRequest(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting on-sale products");
+                return StatusCode(500, BaseResponseDto<IEnumerable<ProductDto>>.Failure("Internal server error"));
             }
         }
 

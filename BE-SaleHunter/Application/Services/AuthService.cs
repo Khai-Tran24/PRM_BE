@@ -1,13 +1,14 @@
+﻿using AutoMapper;
+using BE_SaleHunter.Application.DTOs;
+using BE_SaleHunter.Application.DTOs.Auth;
+using BE_SaleHunter.Core.Entities;
+using BE_SaleHunter.Core.Interfaces;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.Identity;
-using AutoMapper;
-using BE_SaleHunter.Core.Entities;
-using BE_SaleHunter.Core.Interfaces;
-using BE_SaleHunter.Application.DTOs;
-using BE_SaleHunter.Application.DTOs.Auth;
 
 namespace BE_SaleHunter.Application.Services
 {
@@ -20,6 +21,7 @@ namespace BE_SaleHunter.Application.Services
         Task<BaseResponseDto<bool>> ChangePasswordAsync(string userId, ChangePasswordRequestDto request);
         Task<BaseResponseDto<bool>> ForgotPasswordAsync(ForgotPasswordRequestDto request);
         Task<BaseResponseDto<bool>> ResetPasswordAsync(ResetPasswordRequestDto request);
+        Task<BaseResponseDto<bool>> VerifyResetTokenAsync(string token);
     }
 
     public class AuthService(
@@ -27,7 +29,7 @@ namespace BE_SaleHunter.Application.Services
         IPasswordHasher<User> passwordHasher,
         IMapper mapper,
         IConfiguration configuration,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger, IEmailService _emailService)
         : IAuthService
     {
         public async Task<BaseResponseDto<LoginResponseDto>> LoginAsync(LoginRequestDto request)
@@ -45,10 +47,12 @@ namespace BE_SaleHunter.Application.Services
                 {
                     return BaseResponseDto<LoginResponseDto>.Failure("Invalid email or password");
                 } // Update last login
-
+                if (!user.IsActive)
+                {
+                    return BaseResponseDto<LoginResponseDto>.Failure("user was deactivated");
+                }
                 user.LastLoginDate = DateTime.UtcNow;
-                await unitOfWork.UserRepository.UpdateAsync(user);
-                await unitOfWork.CompleteAsync();
+
 
                 var tokenResponse = GenerateTokens(user);
 
@@ -59,7 +63,10 @@ namespace BE_SaleHunter.Application.Services
                     ExpiresAt = tokenResponse.ExpiresAt,
                     User = mapper.Map<UserDto>(user)
                 };
-
+                user.RefreshToken = tokenResponse.RefreshToken;
+                user.RefreshTokenExpiry = tokenResponse.ExpiresAt;
+                await unitOfWork.UserRepository.UpdateAsync(user);
+                await unitOfWork.CompleteAsync();
                 return BaseResponseDto<LoginResponseDto>.Success(response, "Login successful");
             }
             catch (Exception ex)
@@ -86,17 +93,13 @@ namespace BE_SaleHunter.Application.Services
                     Name = request.Name,
                     PhoneNumber = request.PhoneNumber,
                     IsActive = true,
+                    Role = "Customer",
                     CreatedAt = DateTime.UtcNow,
                     LastLoginDate = DateTime.UtcNow
                 };
 
                 // Hash password
                 user.PasswordHash = passwordHasher.HashPassword(user, request.Password);
-
-                // Add user to database
-                await unitOfWork.UserRepository.AddAsync(user);
-                await unitOfWork.CompleteAsync();
-
                 var tokenResponse = GenerateTokens(user);
 
                 var response = new RegisterResponseDto
@@ -106,7 +109,12 @@ namespace BE_SaleHunter.Application.Services
                     ExpiresAt = tokenResponse.ExpiresAt,
                     User = mapper.Map<UserDto>(user)
                 };
-
+                user.RefreshToken = tokenResponse.RefreshToken;
+                user.RefreshTokenExpiry = tokenResponse.ExpiresAt;
+                // Add user to database
+                await unitOfWork.UserRepository.AddAsync(user);
+                await unitOfWork.CompleteAsync();
+                
                 return BaseResponseDto<RegisterResponseDto>.Success(response, "Registration successful");
             }
             catch (Exception ex)
@@ -199,11 +207,12 @@ namespace BE_SaleHunter.Application.Services
                 var user = await unitOfWork.UserRepository.GetByEmailAsync(request.Email);
                 if (user == null)
                 {
-                    // Don't reveal if user exists or not for security
+                    // Không tiết lộ user tồn tại hay không
                     return BaseResponseDto<bool>.Success(true,
                         "If an account with this email exists, a password reset link has been sent");
-                } // Generate password reset token (in real app, send email)
+                }
 
+                // Tạo token reset
                 user.PasswordResetToken = Guid.NewGuid().ToString();
                 user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
                 user.UpdatedAt = DateTime.UtcNow;
@@ -211,8 +220,19 @@ namespace BE_SaleHunter.Application.Services
                 await unitOfWork.UserRepository.UpdateAsync(user);
                 await unitOfWork.CompleteAsync();
 
-                // TODO: Send email with reset link
-                logger.LogInformation("Password reset requested for email: {Email}", request.Email);
+                // Tạo link reset
+                var resetLink = $"{configuration["App:BaseUrl"]}ResetPassword?token={user.PasswordResetToken}";
+
+                var htmlMessage = $@"
+            <p>Hello,</p>
+            <p>We received a request to reset your password. Click the link below to reset it:</p>
+            <p><a href='{resetLink}'>Reset Password</a></p>
+            <p>This link will expire in 1 hour.</p>
+            <p>If you did not request this, please ignore this email.</p>";
+
+                await _emailService.SendEmailAsync(user.Email, "Reset Your Password", htmlMessage);
+
+                logger.LogInformation("Password reset email sent to {Email}", request.Email);
 
                 return BaseResponseDto<bool>.Success(true,
                     "If an account with this email exists, a password reset link has been sent");
@@ -249,7 +269,8 @@ namespace BE_SaleHunter.Application.Services
                 logger.LogError(ex, "Error during password reset");
                 return BaseResponseDto<bool>.Failure("An error occurred while resetting password");
             }
-        }        private TokenResponseDto GenerateTokens(User user)
+        }        
+        private TokenResponseDto GenerateTokens(User user)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var jwtKey = configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key is not configured");
@@ -260,6 +281,7 @@ namespace BE_SaleHunter.Application.Services
                 new(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new(ClaimTypes.Email, user.Email),
                 new(ClaimTypes.Name, user.Name),
+                new("Role", user.Role),
                 new("jti", Guid.NewGuid().ToString())
             };
 
@@ -291,6 +313,30 @@ namespace BE_SaleHunter.Application.Services
                 RefreshToken = refreshToken,
                 ExpiresAt = tokenDescriptor.Expires.Value
             };
+        }
+
+        public async Task<BaseResponseDto<bool>> VerifyResetTokenAsync(string token)
+        {
+            try
+            {
+                var user = await unitOfWork.UserRepository.GetByPasswordResetTokenAsync(token);
+                if (user == null)
+                {
+                    return BaseResponseDto<bool>.Failure("Invalid or expired reset token");
+                }
+
+                if (user.PasswordResetTokenExpiry < DateTime.UtcNow)
+                {
+                    return BaseResponseDto<bool>.Failure("Reset token has expired");
+                }
+
+                return BaseResponseDto<bool>.Success(true, "Reset token is valid");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error verifying reset token");
+                return BaseResponseDto<bool>.Failure("An error occurred while verifying reset token");
+            }
         }
     }
 
