@@ -399,7 +399,7 @@ namespace BE_SaleHunter.Application.Services
                 };
 
                 await unitOfWork.GenericRepository<ProductView>().AddAsync(productView);
-                await unitOfWork.CompleteAsync();
+                //await unitOfWork.CompleteAsync();
 
                 return BaseResponseDto<bool>.Success(true, "Product view recorded");
             }
@@ -407,7 +407,7 @@ namespace BE_SaleHunter.Application.Services
             {
                 logger.LogError(ex, "Error adding product view: {ProductId}, User: {UserId}", productId, userId);
                 return BaseResponseDto<bool>.Success(true,
-                    "Product view not recorded, but continuing"); // Don't fail for view tracking
+                    "Product view not recorded, but continuing");
             }
         }
 
