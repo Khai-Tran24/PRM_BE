@@ -56,7 +56,7 @@ builder.Services.AddSwaggerGen(c =>
             "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
         Name = "Authorization",
         In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
+        Type = SecuritySchemeType.Http,
         Scheme = "Bearer"
     });
 
@@ -83,7 +83,7 @@ Log.Information("SERVICE REGISTRATION - Configuring Entity Framework with connec
 
 builder.Services.AddDbContext<SaleHunterDbContext>(options =>
     options.UseSqlServer(connectionString));
-Log.Information("SERVICE REGISTRATION - Entity Framework with SQL Server registered");
+Log.Information("SERVICE REGISTRATION - Entity Framework with SQl server registered");
 
 // Configure JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new ArgumentNullException("Jwt:Key configuration is required");
@@ -113,7 +113,17 @@ builder.Services.AddAuthentication(options =>
 Log.Information("SERVICE REGISTRATION - JWT Authentication configured");
 
 // Configure Authorization
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(option =>
+{
+    option.AddPolicy("Owner", policyBuilder => 
+        policyBuilder.RequireAssertion(
+              context => context.User.HasClaim(claim => claim.Type == "Role") &&
+              context.User.FindFirst(claim => claim.Type == "Role").Value == "Owner"));
+    option.AddPolicy("Admin", policyBuilder =>
+        policyBuilder.RequireAssertion(
+              context => context.User.HasClaim(claim => claim.Type == "Role") &&
+              context.User.FindFirst(claim => claim.Type == "Role").Value == "Admin"));
+});
 Log.Information("SERVICE REGISTRATION - Authorization configured");
 
 // Configure CORS for mobile app
@@ -178,10 +188,26 @@ builder.Services.AddScoped<IStoreService, StoreService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IImageStorageService, MinioImageStorageService>();
 builder.Services.AddScoped<ILocationService, OpenStreetMapLocationService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 Log.Information("SERVICE REGISTRATION - Service Layer registered (AuthService, UserService, StoreService, ProductService, ImageStorageService, LocationService)");
-
+builder.Services.AddRazorPages();
 Log.Information("APPLICATION STARTUP - Building application...");
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<SaleHunterDbContext>();
+        context.Database.EnsureCreated();
+        Log.Information("Database schema checked and ensured.");
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "An error occurred creating the DB.");
+    }
+}
 
 // Initialize service locator for enrichers
 ServiceLocator.SetServiceProvider(app.Services);
@@ -189,7 +215,7 @@ ServiceLocator.SetServiceProvider(app.Services);
 Log.Information("APPLICATION STARTUP - Application built successfully");
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
@@ -209,16 +235,14 @@ app.UseSerilogRequestLogging();
 app.UseGlobalExceptionHandler();
 
 app.UseHttpsRedirection();
-
+app.UseStaticFiles();
+app.UseRouting();
 app.UseCors("AllowMobileApp");
-
+app.MapRazorPages();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
-// Health check endpoint
-app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Timestamp = DateTime.UtcNow }));
 
 try
 {

@@ -15,8 +15,8 @@ namespace BE_SaleHunter.Application.DTOs
         [Range(0.01, double.MaxValue)]
         public decimal Price { get; set; }
 
-        [Range(0, double.MaxValue)]
-        public decimal? DiscountedPrice { get; set; }
+        [Range(0, int.MaxValue)]
+        public int? SalePercent { get; set; }
 
         [StringLength(100)]
         public string? Brand { get; set; }
@@ -40,7 +40,7 @@ namespace BE_SaleHunter.Application.DTOs
         public decimal? Price { get; set; }
 
         [Range(0, double.MaxValue)]
-        public decimal? DiscountedPrice { get; set; }
+        public int? SalePercent { get; set; }
 
         [StringLength(100)]
         public string? Brand { get; set; }
@@ -57,8 +57,8 @@ namespace BE_SaleHunter.Application.DTOs
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
         public decimal CurrentPrice { get; set; }
-        public decimal? DiscountedPrice { get; set; }
-        public decimal FinalPrice => DiscountedPrice ?? CurrentPrice;
+        public int? SalePercent { get; set; }
+        public decimal FinalPrice => SalePercent.Value > 0 ? CurrentPrice * (1 - SalePercent.Value / 100m) : CurrentPrice;
         public string? Brand { get; set; }
         public string Category { get; set; } = string.Empty;
         public List<ProductImageDto> Images { get; set; } = new();

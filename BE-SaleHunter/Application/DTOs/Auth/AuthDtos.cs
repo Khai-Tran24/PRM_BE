@@ -97,6 +97,13 @@ namespace BE_SaleHunter.Application.DTOs.Auth
         public string RefreshToken { get; set; } = string.Empty;
     }
 
+    // Verify Token DTOs
+    public class VerifyTokenRequestDto
+    {
+        [Required]
+        public string Token { get; set; } = string.Empty;
+    }
+
     // Legacy DTOs for backward compatibility
     public class SignInDto : LoginRequestDto { }
     public class SignUpDto : RegisterRequestDto { }

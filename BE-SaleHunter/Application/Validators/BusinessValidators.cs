@@ -19,10 +19,10 @@ namespace BE_SaleHunter.Application.Validators
             RuleFor(x => x.Price)
                 .GreaterThan(0).WithMessage("Price must be greater than 0");
 
-            RuleFor(x => x.DiscountedPrice)
-                .GreaterThan(0).WithMessage("Discounted price must be greater than 0")
+            RuleFor(x => (decimal)x.SalePercent)
+                .GreaterThan(0).WithMessage("Sale Percent must be greater than 0")
                 .LessThan(x => x.Price).WithMessage("Discounted price must be less than regular price")
-                .When(x => x.DiscountedPrice.HasValue);
+                .When(x => x.SalePercent.HasValue);
 
             RuleFor(x => x.Brand)
                 .MaximumLength(100).WithMessage("Brand cannot exceed 100 characters")
@@ -54,10 +54,10 @@ namespace BE_SaleHunter.Application.Validators
                 .GreaterThan(0).WithMessage("Price must be greater than 0")
                 .When(x => x.Price.HasValue);
 
-            RuleFor(x => x.DiscountedPrice)
+            RuleFor(x => (decimal)x.SalePercent)
                 .GreaterThan(0).WithMessage("Discounted price must be greater than 0")
                 .LessThan(x => x.Price).WithMessage("Discounted price must be less than regular price")
-                .When(x => x.DiscountedPrice.HasValue && x.Price.HasValue);
+                .When(x => x.SalePercent.HasValue && x.Price.HasValue);
 
             RuleFor(x => x.Brand)
                 .MaximumLength(100).WithMessage("Brand cannot exceed 100 characters")

@@ -1,4 +1,4 @@
-using BE_SaleHunter.Core.Entities;
+﻿using BE_SaleHunter.Core.Entities;
 using BE_SaleHunter.Core.Interfaces;
 using BE_SaleHunter.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -29,7 +29,8 @@ namespace BE_SaleHunter.Infrastructure.Repositories
         public IGenericRepository<T> GenericRepository<T>() where T : BaseEntity
         {
             return (IGenericRepository<T>)_serviceProvider.GetService(typeof(IGenericRepository<T>))!;
-        }        public async Task<int> CompleteAsync()
+        }
+        public async Task<int> CompleteAsync()
         {
             _logger.LogDebug("REPOSITORY LAYER - Completing Unit of Work transaction");
             var result = await _context.SaveChangesAsync();
@@ -73,9 +74,7 @@ namespace BE_SaleHunter.Infrastructure.Repositories
             if (!_disposed && disposing)
             {
                 _transaction?.Dispose();
-                _context.Dispose();
             }
-
             _disposed = true;
         }
 

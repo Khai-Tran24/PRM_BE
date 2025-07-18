@@ -24,6 +24,8 @@ namespace BE_SaleHunter.Application.Services
         Task<BaseResponseDto<bool>> RemoveFromFavoritesAsync(long productId, long userId);
         Task<BaseResponseDto<bool>> AddProductViewAsync(long productId, long userId);
         Task<BaseResponseDto<IEnumerable<ProductDto>>> GetViewHistoryAsync(long userId);
+        Task<BaseResponseDto<IEnumerable<ProductDto>>> GetRecommendedProductsAsync(long userId);
+        Task<BaseResponseDto<IEnumerable<ProductDto>>> GetOnSaleProductsAsync();
 
         Task<BaseResponseDto<bool>>
             AddProductRatingAsync(long productId, long userId, CreateProductRatingDto ratingDto);
@@ -57,7 +59,7 @@ namespace BE_SaleHunter.Application.Services
                     Category = createProductDto.Category,
                     Brand = createProductDto.Brand,
                     Price = createProductDto.Price,
-                    SalePercent = 0,
+                    SalePercent = createProductDto.SalePercent ?? 0,
                     StoreId = user.Store.Id,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -183,7 +185,10 @@ namespace BE_SaleHunter.Application.Services
                 {
                     product.Price = updateProductDto.Price.Value;
                 }
-
+                if (updateProductDto.Price.HasValue)
+                {
+                    product.SalePercent = updateProductDto.SalePercent.Value;
+                }
                 product.UpdatedAt = DateTime.UtcNow;
                 await unitOfWork.ProductRepository.UpdateAsync(product); // Update price history if provided
                 if (updateProductDto.Price.HasValue)
@@ -394,7 +399,7 @@ namespace BE_SaleHunter.Application.Services
                 };
 
                 await unitOfWork.GenericRepository<ProductView>().AddAsync(productView);
-                await unitOfWork.CompleteAsync();
+                //await unitOfWork.CompleteAsync();
 
                 return BaseResponseDto<bool>.Success(true, "Product view recorded");
             }
@@ -402,7 +407,7 @@ namespace BE_SaleHunter.Application.Services
             {
                 logger.LogError(ex, "Error adding product view: {ProductId}, User: {UserId}", productId, userId);
                 return BaseResponseDto<bool>.Success(true,
-                    "Product view not recorded, but continuing"); // Don't fail for view tracking
+                    "Product view not recorded, but continuing");
             }
         }
 
@@ -488,6 +493,53 @@ namespace BE_SaleHunter.Application.Services
                 logger.LogError(ex, "Error getting product ratings: {ProductId}", productId);
                 return BaseResponseDto<IEnumerable<ProductRatingDto>>.Failure(
                     "An error occurred while retrieving product ratings");
+            }
+        }
+
+        public async Task<BaseResponseDto<IEnumerable<ProductDto>>> GetRecommendedProductsAsync(long userId)
+        {
+            try
+            {
+                // Simple implementation: return recent products from user's favorite stores
+                // In a real implementation, this would use ML algorithms
+                var userFavoriteRepo = unitOfWork.GenericRepository<UserFavorite>();
+                var userFavorites = await userFavoriteRepo.GetAllAsync();
+                var userSpecificFavorites = userFavorites.Where(f => f.UserId == userId).ToList();
+                
+                if (!userSpecificFavorites.Any())
+                {
+                    // If no favorites, return recent products
+                    var recentProducts = await unitOfWork.ProductRepository.GetRecentProductsAsync(20);
+                    var recentDtos = mapper.Map<IEnumerable<ProductDto>>(recentProducts);
+                    return BaseResponseDto<IEnumerable<ProductDto>>.Success(recentDtos);
+                }
+
+                // Get products from the user's favorited product list
+                var favoriteProductIds = userSpecificFavorites.Select(f => f.ProductId).ToList();
+                var favoriteProducts = await unitOfWork.ProductRepository.GetAllAsync();
+                var recommendedProducts = favoriteProducts.Where(p => favoriteProductIds.Contains(p.Id)).Take(20);
+                var productDtos = mapper.Map<IEnumerable<ProductDto>>(recommendedProducts);
+                return BaseResponseDto<IEnumerable<ProductDto>>.Success(productDtos);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error getting recommended products for user: {UserId}", userId);
+                return BaseResponseDto<IEnumerable<ProductDto>>.Failure("An error occurred while retrieving recommended products");
+            }
+        }
+
+        public async Task<BaseResponseDto<IEnumerable<ProductDto>>> GetOnSaleProductsAsync()
+        {
+            try
+            {
+                var onSaleProducts = await unitOfWork.ProductRepository.GetOnSaleProductsAsync(50);
+                var productDtos = mapper.Map<IEnumerable<ProductDto>>(onSaleProducts);
+                return BaseResponseDto<IEnumerable<ProductDto>>.Success(productDtos);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error getting on-sale products");
+                return BaseResponseDto<IEnumerable<ProductDto>>.Failure("An error occurred while retrieving on-sale products");
             }
         }
     }

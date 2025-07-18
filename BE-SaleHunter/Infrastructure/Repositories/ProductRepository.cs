@@ -102,5 +102,36 @@ namespace BE_SaleHunter.Infrastructure.Repositories
                 .OrderBy(b => b)
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<Product>> GetRecentProductsAsync(int count)
+        {
+            return await _context.Products
+                .Include(p => p.Store)
+                .OrderByDescending(p => p.CreatedAt)
+                .Take(count)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Product>> GetProductsByStoreIdsAsync(IEnumerable<long> storeIds, int count)
+        {
+            return await _context.Products
+                .Include(p => p.Store)
+                .Include(p => p.Ratings)
+                .Where(p => storeIds.Contains(p.StoreId))
+                .OrderByDescending(p => p.CreatedAt)
+                .Take(count)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Product>> GetOnSaleProductsAsync(int count)
+        {
+            return await _context.Products
+                .Include(p => p.Store)
+                .Include(p => p.Ratings)
+                .Where(p => p.SalePercent > 0)
+                .OrderByDescending(p => p.SalePercent)
+                .Take(count)
+                .ToListAsync();
+        }
     }
 }
