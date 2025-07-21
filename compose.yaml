@@ -1,0 +1,46 @@
+﻿services:
+  be-salehunter:
+    image: be-salehunter
+    build:
+      context: .
+      dockerfile: BE-SaleHunter/Dockerfile
+  
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    deploy:
+      resources:
+        limits:
+          memory: 10g
+          cpus: "5"
+    security_opt:
+      - no-new-privileges
+    cap_drop:
+      - ALL
+    cap_add:
+      - SYS_NICE
+    read_only: true
+    volumes:
+      - ollama:/root/.ollama
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    runtime: nvidia
+    shm_size: '1gb'
+    entrypoint: >
+      sh -c "
+        echo 'Starting Ollama service...'
+        /bin/ollama serve &
+        OLLAMA_PID=$!
+        echo 'Waiting for Ollama to become available...'
+        while ! ollama ps > /dev/null 2>&1; do
+          sleep 1
+        done
+        echo 'Ollama is up. Pulling model (llama3.2:1b)...'
+        ollama pull llama3.2:1b
+        echo 'Model pull complete. The container will now wait for the Ollama process to exit.'
+        wait $OLLAMA_PID
+      "

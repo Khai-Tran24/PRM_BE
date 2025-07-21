@@ -14,13 +14,13 @@ namespace BE_SaleHunter.Infrastructure.Repositories
 
         public async Task<ProductRating?> GetUserRatingForProductAsync(long productId, long userId)
         {
-            return await _dbSet
+            return await DbSet
                 .FirstOrDefaultAsync(pr => pr.ProductId == productId && pr.UserId == userId);
         }
 
         public async Task<IEnumerable<ProductRating>> GetProductRatingsAsync(long productId)
         {
-            return await _dbSet
+            return await DbSet
                 .Where(pr => pr.ProductId == productId)
                 .Include(pr => pr.User)
                 .OrderByDescending(pr => pr.CreatedAt)
@@ -29,7 +29,7 @@ namespace BE_SaleHunter.Infrastructure.Repositories
 
         public async Task<double> GetAverageRatingAsync(long productId)
         {
-            var ratings = await _dbSet
+            var ratings = await DbSet
                 .Where(pr => pr.ProductId == productId)
                 .Select(pr => pr.Rating)
                 .ToListAsync();
@@ -39,7 +39,7 @@ namespace BE_SaleHunter.Infrastructure.Repositories
 
         public async Task<int> GetRatingCountAsync(long productId)
         {
-            return await _dbSet
+            return await DbSet
                 .CountAsync(pr => pr.ProductId == productId);
         }
     }

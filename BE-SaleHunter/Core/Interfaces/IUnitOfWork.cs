@@ -8,6 +8,9 @@ namespace BE_SaleHunter.Core.Interfaces
         IStoreRepository StoreRepository { get; }
         IProductRepository ProductRepository { get; }
         IProductRatingRepository ProductRatingRepository { get; }
+        IChatMessageRepository ChatMessageRepository { get; }
+        IChatConversationRepository ChatConversationRepository { get; }
+        IOrderRepository OrderRepository { get; }
         IGenericRepository<T> GenericRepository<T>() where T : BaseEntity;
         Task<int> CompleteAsync();
         Task BeginTransactionAsync();

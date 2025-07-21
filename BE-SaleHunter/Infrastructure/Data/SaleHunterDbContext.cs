@@ -17,6 +17,10 @@ namespace BE_SaleHunter.Infrastructure.Data
         public DbSet<ProductRating> ProductRatings { get; set; }
         public DbSet<UserFavorite> UserFavorites { get; set; }
         public DbSet<ProductView> ProductViews { get; set; }
+        public DbSet<Order> Orders { get; set; }
+        public DbSet<OrderDetail> OrderDetails { get; set; }
+        public DbSet<ChatConversation> ChatConversations { get; set; }
+        public DbSet<ChatMessage> ChatMessages { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -158,6 +162,34 @@ namespace BE_SaleHunter.Infrastructure.Data
                     .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasIndex(pv => pv.ViewedAt);
+            });
+
+            // Configure ChatConversation entity
+            builder.Entity<ChatConversation>(entity =>
+            {
+                entity.Property(c => c.Title).IsRequired().HasMaxLength(500);
+
+                entity.HasOne(c => c.User)
+                    .WithMany()
+                    .HasForeignKey(c => c.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(c => c.UserId);
+                entity.HasIndex(c => c.CreatedAt);
+            });
+
+            // Configure ChatMessage entity
+            builder.Entity<ChatMessage>(entity =>
+            {
+                entity.Property(m => m.Content).IsRequired().HasMaxLength(2000);
+
+                entity.HasOne(m => m.ChatConversation)
+                    .WithMany(c => c.Messages)
+                    .HasForeignKey(m => m.ConversationId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(m => m.ConversationId);
+                entity.HasIndex(m => m.CreatedAt);
             });
 
             // Configure base entity properties for all entities

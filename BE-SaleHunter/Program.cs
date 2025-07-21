@@ -1,21 +1,25 @@
-using System.Text;
+using BE_SaleHunter.Application.Mappings;
+using BE_SaleHunter.Application.Services;
+using BE_SaleHunter.Application.Validators;
+using BE_SaleHunter.Core.Entities;
+using BE_SaleHunter.Core.Interfaces;
+using BE_SaleHunter.Infrastructure.Data;
+using BE_SaleHunter.Infrastructure.Logging;
+using BE_SaleHunter.Infrastructure.Middleware;
+using BE_SaleHunter.Infrastructure.Repositories;
+using BE_SaleHunter.Infrastructure.Services;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using FluentValidation;
-using Serilog;
 using Minio;
-using BE_SaleHunter.Core.Entities;
-using BE_SaleHunter.Core.Interfaces;
-using BE_SaleHunter.Infrastructure.Data;
-using BE_SaleHunter.Infrastructure.Repositories;
-using BE_SaleHunter.Application.Services;
-using BE_SaleHunter.Application.Mappings;
-using BE_SaleHunter.Application.Validators;
-using BE_SaleHunter.Infrastructure.Logging;
-using BE_SaleHunter.Infrastructure.Middleware;
+using Net.payOS;
+using Serilog;
+using StackExchange.Redis;
+using System.Reflection;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -56,7 +60,7 @@ builder.Services.AddSwaggerGen(c =>
             "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
         Name = "Authorization",
         In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
+        Type = SecuritySchemeType.Http,
         Scheme = "Bearer"
     });
 
@@ -74,6 +78,9 @@ builder.Services.AddSwaggerGen(c =>
             []
         }
     });
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
 });
 
 // Configure Entity Framework with PostgreSQL
@@ -83,7 +90,7 @@ Log.Information("SERVICE REGISTRATION - Configuring Entity Framework with connec
 
 builder.Services.AddDbContext<SaleHunterDbContext>(options =>
     options.UseSqlServer(connectionString));
-Log.Information("SERVICE REGISTRATION - Entity Framework with SQL Server registered");
+Log.Information("SERVICE REGISTRATION - Entity Framework with SQl server registered");
 
 // Configure JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new ArgumentNullException("Jwt:Key configuration is required");
@@ -113,7 +120,17 @@ builder.Services.AddAuthentication(options =>
 Log.Information("SERVICE REGISTRATION - JWT Authentication configured");
 
 // Configure Authorization
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(option =>
+{
+    option.AddPolicy("Owner", policyBuilder => 
+        policyBuilder.RequireAssertion(
+              context => context.User.HasClaim(claim => claim.Type == "Role") &&
+              context.User.FindFirst(claim => claim.Type == "Role").Value == "Owner"));
+    option.AddPolicy("Admin", policyBuilder =>
+        policyBuilder.RequireAssertion(
+              context => context.User.HasClaim(claim => claim.Type == "Role") &&
+              context.User.FindFirst(claim => claim.Type == "Role").Value == "Admin"));
+});
 Log.Information("SERVICE REGISTRATION - Authorization configured");
 
 // Configure CORS for mobile app
@@ -158,7 +175,9 @@ Log.Information("SERVICE REGISTRATION - MinIO configured (Endpoint: {Endpoint}, 
 
 // Configure HttpClient for location services
 builder.Services.AddHttpClient<ILocationService, OpenStreetMapLocationService>();
-Log.Information("SERVICE REGISTRATION - HttpClient for location services configured");
+// Configure HttpClient for chat service (Ollama integration)
+builder.Services.AddHttpClient<IChatService, ChatService>();
+Log.Information("SERVICE REGISTRATION - HttpClient for location and chat services configured");
 
 Log.Information("SERVICE REGISTRATION - Registering Repository Layer...");
 // Register Repository Layer
@@ -167,6 +186,8 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IStoreRepository, StoreRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IProductRatingRepository, ProductRatingRepository>();
+builder.Services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
+builder.Services.AddScoped<IChatConversationRepository, ChatConversationRepository>();
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 Log.Information("SERVICE REGISTRATION - Repository Layer registered (UnitOfWork, UserRepository, StoreRepository, ProductRepository, ProductRatingRepository, GenericRepository)");
 
@@ -178,10 +199,51 @@ builder.Services.AddScoped<IStoreService, StoreService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IImageStorageService, MinioImageStorageService>();
 builder.Services.AddScoped<ILocationService, OpenStreetMapLocationService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<ICartService, CartService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
 Log.Information("SERVICE REGISTRATION - Service Layer registered (AuthService, UserService, StoreService, ProductService, ImageStorageService, LocationService)");
-
+//add payos
+PayOS payOS = new PayOS(builder.Configuration["PayOS:PAYOS_CLIENT_ID"] ?? throw new Exception("Cannot find environment"),
+                   builder.Configuration["PayOS:PAYOS_API_KEY"] ?? throw new Exception("Cannot find environment"),
+                   builder.Configuration["PayOS:PAYOS_CHECKSUM_KEY"] ?? throw new Exception("Cannot find environment"));
+builder.Services.AddSingleton(payOS);
+builder.Services.AddSingleton<IConnectionMultiplexer>(opts =>
+{
+    var options = new ConfigurationOptions
+    {
+        EndPoints = { builder.Configuration["Redis:Server"]! },
+        User = builder.Configuration["Redis:User"],
+        Password = builder.Configuration["Redis:Password"],
+        Ssl = true,
+        AbortOnConnectFail = false,
+        ConnectRetry = 3,
+        ConnectTimeout = 10000,
+        KeepAlive = 30,
+        SyncTimeout = 10000,
+    };
+    return ConnectionMultiplexer.Connect(options);
+});
+//Add razer pages
+builder.Services.AddRazorPages();
 Log.Information("APPLICATION STARTUP - Building application...");
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<SaleHunterDbContext>();
+        context.Database.EnsureCreated();
+        Log.Information("Database schema checked and ensured.");
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "An error occurred creating the DB.");
+    }
+}
 
 // Initialize service locator for enrichers
 ServiceLocator.SetServiceProvider(app.Services);
@@ -189,7 +251,7 @@ ServiceLocator.SetServiceProvider(app.Services);
 Log.Information("APPLICATION STARTUP - Application built successfully");
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
@@ -209,16 +271,14 @@ app.UseSerilogRequestLogging();
 app.UseGlobalExceptionHandler();
 
 app.UseHttpsRedirection();
-
+app.UseStaticFiles();
+app.UseRouting();
 app.UseCors("AllowMobileApp");
-
+app.MapRazorPages();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
-// Health check endpoint
-app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Timestamp = DateTime.UtcNow }));
 
 try
 {

@@ -1,9 +1,10 @@
 using Minio;
 using Minio.DataModel.Args;
-using System.Text;
+using BE_SaleHunter.Core.Interfaces;
 
-namespace BE_SaleHunter.Application.Services
-{    public class MinioImageStorageService : IImageStorageService
+namespace BE_SaleHunter.Infrastructure.Services
+{
+    public class MinioImageStorageService : IImageStorageService
     {
         private readonly IMinioClient _minioClient;
         private readonly string _bucketName;
@@ -15,7 +16,8 @@ namespace BE_SaleHunter.Application.Services
             ILogger<MinioImageStorageService> logger)
         {
             _minioClient = minioClient;
-            _bucketName = configuration["MinIO:BucketName"] ?? throw new ArgumentNullException("MinIO:BucketName configuration is required");
+            _bucketName = configuration["MinIO:BucketName"] ??
+                          throw new ArgumentNullException("MinIO:BucketName configuration is required");
             _logger = logger;
         }
 
@@ -26,17 +28,17 @@ namespace BE_SaleHunter.Application.Services
                 // Remove data URL prefix if present (e.g., "data:image/jpeg;base64,")
                 if (base64Image.Contains(","))
                 {
-                    base64Image = base64Image.Substring(base64Image.IndexOf(",") + 1);
+                    base64Image = base64Image.Substring(base64Image.IndexOf(",", StringComparison.Ordinal) + 1);
                 }
 
                 var imageBytes = Convert.FromBase64String(base64Image);
-                
+
                 // Determine file extension from base64 header or default to jpg
-                var fileExtension = GetFileExtensionFromBase64(base64Image) ?? "jpg";
+                var fileExtension = GetFileExtensionFromBase64(base64Image);
                 var fullFileName = $"{fileName}.{fileExtension}";
 
                 using var stream = new MemoryStream(imageBytes);
-                
+
                 await EnsureBucketExistsAsync();
 
                 var putObjectArgs = new PutObjectArgs()
@@ -65,7 +67,7 @@ namespace BE_SaleHunter.Application.Services
                 var fullFileName = $"{fileName}.{fileExtension}";
 
                 using var stream = file.OpenReadStream();
-                
+
                 await EnsureBucketExistsAsync();
 
                 var putObjectArgs = new PutObjectArgs()
@@ -127,14 +129,11 @@ namespace BE_SaleHunter.Application.Services
             try
             {
                 using var stream = new MemoryStream();
-                
+
                 var getObjectArgs = new GetObjectArgs()
                     .WithBucket(_bucketName)
                     .WithObject(fileName)
-                    .WithCallbackStream(async (streamData) =>
-                    {
-                        await streamData.CopyToAsync(stream);
-                    });
+                    .WithCallbackStream(async void (streamData) => { await streamData.CopyToAsync(stream); });
 
                 await _minioClient.GetObjectAsync(getObjectArgs);
                 return stream.ToArray();
@@ -170,7 +169,7 @@ namespace BE_SaleHunter.Application.Services
             }
         }
 
-        private string? GetFileExtensionFromBase64(string base64)
+        private string GetFileExtensionFromBase64(string base64)
         {
             try
             {
@@ -183,7 +182,7 @@ namespace BE_SaleHunter.Application.Services
                     return "gif";
                 if (header.Contains("webp"))
                     return "webp";
-                
+
                 return "jpg"; // Default
             }
             catch

@@ -1,3 +1,4 @@
+using BE_SaleHunter.Application.DTOs;
 using BE_SaleHunter.Core.Entities;
 
 namespace BE_SaleHunter.Core.Interfaces
@@ -9,5 +10,6 @@ namespace BE_SaleHunter.Core.Interfaces
         Task<IEnumerable<Store>> GetStoresByLocationAsync(decimal latitude, decimal longitude, double radiusKm);
         Task<IEnumerable<Store>> SearchStoresAsync(string searchTerm);
         Task<bool> UserHasStoreAsync(long userId);
+        Task<List<User>> GetCustomerOfStoreAsync(long storeId);
     }
 }

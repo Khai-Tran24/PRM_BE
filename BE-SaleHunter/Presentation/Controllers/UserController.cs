@@ -1,7 +1,8 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
-using BE_SaleHunter.Application.Services;
 using BE_SaleHunter.Application.DTOs;
+using BE_SaleHunter.Application.DTOs.Store;
+using BE_SaleHunter.Application.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
 namespace BE_SaleHunter.Presentation.Controllers
@@ -175,7 +176,34 @@ namespace BE_SaleHunter.Presentation.Controllers
                 return StatusCode(500, BaseResponseDto<bool>.Failure("Internal server error"));
             }
         }
+        /// <summary>
+        /// Get customer analytics
+        /// </summary>
+        [HttpGet("analytics")]
+        //[Authorize(Policy = "Administrator")]
+        public async Task<ActionResult<BaseResponseDto<CustomerAnalyticsDto>>> GetCustomerAnalytics()
+        {
+            _logger.LogInformation("GetCustomerAnalytics request received");
 
+            try
+            {
+                var result = await _userService.GetCustomerAnalyticsAsync();
+
+                if (result.IsSuccess)
+                {
+                    _logger.LogInformation("GetCustomerAnalytics successful - TotalCustomers: {Total}", result.Data.TotalCustomers);
+                    return Ok(result);
+                }
+
+                _logger.LogWarning("GetCustomerAnalytics failed - Error: {Error}", result.Message);
+                return BadRequest(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting customer analytics");
+                return StatusCode(500, BaseResponseDto<CustomerAnalyticsDto>.Failure("Internal server error"));
+            }
+        }
         private long? GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

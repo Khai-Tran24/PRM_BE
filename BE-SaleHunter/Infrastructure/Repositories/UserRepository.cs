@@ -3,6 +3,7 @@ using BE_SaleHunter.Core.Interfaces;
 using BE_SaleHunter.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Linq.Expressions;
 
 namespace BE_SaleHunter.Infrastructure.Repositories
 {
@@ -14,24 +15,27 @@ namespace BE_SaleHunter.Infrastructure.Repositories
 
         public async Task<User?> GetByEmailAsync(string email)
         {
-            return await _dbSet.FirstOrDefaultAsync(u => u.Email == email);
+            return await DbSet.FirstOrDefaultAsync(u => u.Email == email);
         }
 
         public async Task<User?> GetByIdWithStoreAsync(long id)
         {
-            return await _dbSet
+            return await DbSet
                 .Include(u => u.Store)
                 .FirstOrDefaultAsync(u => u.Id == id);
         }
 
         public async Task<bool> EmailExistsAsync(string email)
         {
-            return await _dbSet.AnyAsync(u => u.Email == email);
+            return await DbSet.AnyAsync(u => u.Email == email);
         }
-
+        public async Task<int> CountAsync(Expression<Func<User, bool>> predicate)
+        {
+            return await DbSet.Where(predicate).CountAsync();
+        }
         public async Task<User?> GetUserWithFavoritesAsync(long userId)
         {
-            return await _dbSet
+            return await DbSet
                 .Include(u => u.Favorites)
                     .ThenInclude(f => f.Product)
                         .ThenInclude(p => p.Images)
@@ -43,7 +47,7 @@ namespace BE_SaleHunter.Infrastructure.Repositories
 
         public async Task<User?> GetUserWithViewHistoryAsync(long userId)
         {
-            return await _dbSet
+            return await DbSet
                 .Include(u => u.ProductViews)
                     .ThenInclude(pv => pv.Product)
                         .ThenInclude(p => p.Images)                .Include(u => u.ProductViews)
@@ -54,12 +58,12 @@ namespace BE_SaleHunter.Infrastructure.Repositories
 
         public async Task<User?> GetByRefreshTokenAsync(string refreshToken)
         {
-            return await _dbSet.FirstOrDefaultAsync(u => u.RefreshToken == refreshToken);
+            return await DbSet.FirstOrDefaultAsync(u => u.RefreshToken == refreshToken);
         }
 
         public async Task<User?> GetByPasswordResetTokenAsync(string resetToken)
         {
-            return await _dbSet.FirstOrDefaultAsync(u => u.PasswordResetToken == resetToken);
+            return await DbSet.FirstOrDefaultAsync(u => u.PasswordResetToken == resetToken);
         }
     }
 }

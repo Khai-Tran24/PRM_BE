@@ -1,6 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using BE_SaleHunter.Application.DTOs;
-
 namespace BE_SaleHunter.Application.DTOs.Store
 {
     public class CreateStoreDto
@@ -91,6 +89,9 @@ namespace BE_SaleHunter.Application.DTOs.Store
         public string? WebsiteUrl { get; set; }
         public long UserId { get; set; }
         public DateTime CreatedAt { get; set; }
+        
+        public int ProductsCount { get; set; }
+        public List<ProductDto> Products { get; set; } = [];
     }
 
     public class StorePageDto : BaseResponseDto
@@ -103,5 +104,11 @@ namespace BE_SaleHunter.Application.DTOs.Store
     public class CreateStoreResponseDto : BaseResponseDto
     {
         public StoreDto? Store { get; set; }
+    }
+    public class CustomerAnalyticsDto
+    {
+        public int TotalCustomers { get; set; }
+        public int ActiveCustomers { get; set; }
+        public int NewCustomersThisMonth { get; set; }
     }
 }

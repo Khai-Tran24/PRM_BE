@@ -39,6 +39,8 @@ namespace BE_SaleHunter.Application.DTOs.Auth
         [Required]
         [Compare("Password")]
         public string ConfirmPassword { get; set; } = string.Empty;
+        [Required]
+        public string Role { get; set; } = string.Empty;
     }
 
     public class RegisterResponseDto
@@ -95,6 +97,13 @@ namespace BE_SaleHunter.Application.DTOs.Auth
     {
         [Required]
         public string RefreshToken { get; set; } = string.Empty;
+    }
+
+    // Verify Token DTOs
+    public class VerifyTokenRequestDto
+    {
+        [Required]
+        public string Token { get; set; } = string.Empty;
     }
 
     // Legacy DTOs for backward compatibility

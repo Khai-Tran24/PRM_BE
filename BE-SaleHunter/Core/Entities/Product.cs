@@ -46,6 +46,7 @@ namespace BE_SaleHunter.Core.Entities
         public virtual ICollection<ProductRating> Ratings { get; set; } = new List<ProductRating>();
         public virtual ICollection<UserFavorite> Favorites { get; set; } = new List<UserFavorite>();
         public virtual ICollection<ProductView> Views { get; set; } = new List<ProductView>();
+        public virtual ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
 
         // Calculated properties
         public decimal FinalPrice => Price - (Price * SalePercent / 100);

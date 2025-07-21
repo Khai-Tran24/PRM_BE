@@ -15,8 +15,8 @@ namespace BE_SaleHunter.Application.DTOs
         [Range(0.01, double.MaxValue)]
         public decimal Price { get; set; }
 
-        [Range(0, double.MaxValue)]
-        public decimal? DiscountedPrice { get; set; }
+        [Range(0, int.MaxValue)]
+        public int? SalePercent { get; set; }
 
         [StringLength(100)]
         public string? Brand { get; set; }
@@ -40,7 +40,7 @@ namespace BE_SaleHunter.Application.DTOs
         public decimal? Price { get; set; }
 
         [Range(0, double.MaxValue)]
-        public decimal? DiscountedPrice { get; set; }
+        public int? SalePercent { get; set; }
 
         [StringLength(100)]
         public string? Brand { get; set; }
@@ -57,21 +57,33 @@ namespace BE_SaleHunter.Application.DTOs
         public string Name { get; set; } = string.Empty;
         public string? Description { get; set; }
         public decimal CurrentPrice { get; set; }
-        public decimal? DiscountedPrice { get; set; }
-        public decimal FinalPrice => DiscountedPrice ?? CurrentPrice;
+        public int? SalePercent { get; set; }
         public string? Brand { get; set; }
         public string Category { get; set; } = string.Empty;
-        public List<ProductImageDto> Images { get; set; } = new();
-        public string? MainImage => Images.FirstOrDefault(i => i.IsMainImage)?.ImageUrl ?? Images.FirstOrDefault()?.ImageUrl;
-        public double AverageRating { get; set; }
-        public int RatingCount { get; set; }
         public bool IsFavorite { get; set; }
-        public long StoreId { get; set; }
-        public string StoreName { get; set; } = string.Empty;
-        public string? StoreImageUrl { get; set; }
         public DateTime CreatedDate { get; set; }
         public DateTime? UpdatedDate { get; set; }
         public bool IsActive { get; set; }
+        
+        // Product Price details
+        public List<ProductPriceDto> Prices { get; set; } = [];
+        public decimal FinalPrice => SalePercent is > 0 ? CurrentPrice * (1 - SalePercent.Value / 100m) : CurrentPrice;
+        
+        // Product Images details
+        public List<ProductImageDto> Images { get; set; } = new();
+        public string? MainImage => Images.FirstOrDefault(i => i.IsMainImage)?.ImageUrl ?? Images.FirstOrDefault()?.ImageUrl;
+        
+        // Product Rating details
+        public double AverageRating { get; set; }
+        public int RatingCount { get; set; }
+        
+        // Store details
+        public long StoreId { get; set; }
+        public string StoreName { get; set; } = string.Empty;
+        public string? StoreImageUrl { get; set; }
+        
+        // ProductView details
+        public int TotalViews { get; set; }
     }
 
     public class ProductImageDto

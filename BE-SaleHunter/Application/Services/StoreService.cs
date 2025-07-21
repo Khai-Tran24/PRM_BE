@@ -1,8 +1,10 @@
 using AutoMapper;
-using BE_SaleHunter.Core.Entities;
-using BE_SaleHunter.Core.Interfaces;
 using BE_SaleHunter.Application.DTOs;
 using BE_SaleHunter.Application.DTOs.Store;
+using BE_SaleHunter.Core.Entities;
+using BE_SaleHunter.Core.Interfaces;
+using CloudinaryDotNet;
+using System.Collections.Generic;
 
 namespace BE_SaleHunter.Application.Services
 {
@@ -10,10 +12,12 @@ namespace BE_SaleHunter.Application.Services
     {
         Task<BaseResponseDto<StoreDto>> CreateStoreAsync(CreateStoreDto createStoreDto, long userId);
         Task<BaseResponseDto<StoreDto>> GetStoreByIdAsync(long storeId);
+        Task<BaseResponseDto<List<UserDto>>> GetCustomerOfStoreAsync(long storeId);
         Task<BaseResponseDto<StoreDto>> GetStoreByUserIdAsync(long userId);
         Task<BaseResponseDto<StoreDto>> UpdateStoreAsync(long storeId, UpdateStoreDto updateStoreDto, long userId);
         Task<BaseResponseDto<bool>> DeleteStoreAsync(long storeId, long userId);
         Task<BaseResponseDto<IEnumerable<StoreDto>>> GetAllStoresAsync();
+        //Task<BaseResponseDto<IEnumerable<UserDto>>> GetAllCustomerAsync(string storeId);
 
         Task<BaseResponseDto<IEnumerable<StoreDto>>> SearchStoresAsync(string query, decimal? latitude = null,
             decimal? longitude = null, double? radiusKm = null);
@@ -29,9 +33,11 @@ namespace BE_SaleHunter.Application.Services
         IImageStorageService imageStorageService,
         ILocationService locationService)
         : IStoreService
-    {        public async Task<BaseResponseDto<StoreDto>> CreateStoreAsync(CreateStoreDto createStoreDto, long userId)
+    {
+        public async Task<BaseResponseDto<StoreDto>> CreateStoreAsync(CreateStoreDto createStoreDto, long userId)
         {
-            logger.LogInformation("SERVICE LAYER - CreateStoreAsync called for UserId: {UserId}, StoreName: {StoreName}", 
+            logger.LogInformation(
+                "SERVICE LAYER - CreateStoreAsync called for UserId: {UserId}, StoreName: {StoreName}",
                 userId, createStoreDto.Name);
 
             try
@@ -44,35 +50,46 @@ namespace BE_SaleHunter.Application.Services
                     logger.LogWarning("User {UserId} already has a store with ID: {StoreId}", userId, existingStore.Id);
                     return BaseResponseDto<StoreDto>.Failure("User already has a store");
                 }
-                
+
                 // Validate required fields
                 if (string.IsNullOrWhiteSpace(createStoreDto.Name) ||
                     string.IsNullOrWhiteSpace(createStoreDto.Address))
                 {
                     logger.LogWarning("Store creation failed - missing required fields for UserId: {UserId}", userId);
                     return BaseResponseDto<StoreDto>.Failure("Name and Address are required");
-                }                logger.LogDebug("Geocoding address: {Address} for store creation", createStoreDto.Address);
+                }
+
+                logger.LogDebug("Geocoding address: {Address} for store creation", createStoreDto.Address);
                 // Geocode the address
-                var coordinates = await locationService.GeocodeAsync(createStoreDto.Address);
-                
-                logger.LogDebug("Geocoding result - Latitude: {Latitude}, Longitude: {Longitude}", 
-                    coordinates?.Latitude, coordinates?.Longitude);
+                if (createStoreDto.Longitude == null || createStoreDto.Latitude == null)
+                {
+                    logger.LogDebug("Coordinates not provided, geocoding address for UserId: {UserId}", userId);
+                    var coordinates = await locationService.GeocodeAsync(createStoreDto.Address);
+
+                    logger.LogDebug("Geocoding result - Latitude: {Latitude}, Longitude: {Longitude}",
+                        coordinates?.Latitude, coordinates?.Longitude);
+                    if (coordinates != null)
+                    {
+                        createStoreDto.Latitude = coordinates.Latitude;
+                        createStoreDto.Longitude = coordinates.Longitude;
+                    }
+                }
 
                 var store = new Store
                 {
                     Name = createStoreDto.Name,
                     Description = createStoreDto.Description,
                     Address = createStoreDto.Address,
-                    Latitude = coordinates?.Latitude ?? 0,
-                    Longitude = coordinates?.Longitude ?? 0,
-                    Phone = createStoreDto.Phone,
-                    Category = createStoreDto.Category,
+                    Latitude = createStoreDto?.Latitude ?? 0,
+                    Longitude = createStoreDto?.Longitude ?? 0,
+                    Phone = createStoreDto?.Phone ?? null,
+                    Category = createStoreDto?.Category ?? "General", // Default to "General" if not provided
                     UserId = userId,
                     CreatedAt = DateTime.UtcNow
                 };
 
                 // Handle store image upload
-                if (!string.IsNullOrWhiteSpace(createStoreDto.LogoBase64))
+                if (!string.IsNullOrWhiteSpace(createStoreDto?.LogoBase64))
                 {
                     logger.LogDebug("Uploading store logo for UserId: {UserId}", userId);
                     try
@@ -91,7 +108,7 @@ namespace BE_SaleHunter.Application.Services
                 }
 
                 logger.LogDebug("Adding store to repository for UserId: {UserId}", userId);
-                await unitOfWork.StoreRepository.AddAsync(store);
+                store = await unitOfWork.StoreRepository.AddAsync(store);
 
                 // Update user's StoreId
                 logger.LogDebug("Updating user StoreId for UserId: {UserId}", userId);
@@ -103,7 +120,8 @@ namespace BE_SaleHunter.Application.Services
                 }
 
                 await unitOfWork.CompleteAsync();
-                logger.LogInformation("Store created successfully - StoreId: {StoreId}, UserId: {UserId}, StoreName: {StoreName}", 
+                logger.LogInformation(
+                    "Store created successfully - StoreId: {StoreId}, UserId: {UserId}, StoreName: {StoreName}",
                     store.Id, userId, store.Name);
 
                 var storeDto = mapper.Map<StoreDto>(store);
@@ -114,7 +132,9 @@ namespace BE_SaleHunter.Application.Services
                 logger.LogError(ex, "Error creating store for user: {UserId}", userId);
                 return BaseResponseDto<StoreDto>.Failure("An error occurred while creating the store");
             }
-        }        public async Task<BaseResponseDto<StoreDto>> GetStoreByIdAsync(long storeId)
+        }
+
+        public async Task<BaseResponseDto<StoreDto>> GetStoreByIdAsync(long storeId)
         {
             logger.LogInformation("SERVICE LAYER - GetStoreByIdAsync called for StoreId: {StoreId}", storeId);
 
@@ -128,7 +148,7 @@ namespace BE_SaleHunter.Application.Services
                     return BaseResponseDto<StoreDto>.Failure("Store not found");
                 }
 
-                logger.LogDebug("Store retrieved successfully - StoreId: {StoreId}, StoreName: {StoreName}", 
+                logger.LogDebug("Store retrieved successfully - StoreId: {StoreId}, StoreName: {StoreName}",
                     store.Id, store.Name);
 
                 var storeDto = mapper.Map<StoreDto>(store);
@@ -345,5 +365,36 @@ namespace BE_SaleHunter.Application.Services
                     "An error occurred while retrieving nearby stores");
             }
         }
+
+        public async Task<BaseResponseDto<List<UserDto>>> GetCustomerOfStoreAsync(long storeId)
+        {
+            try
+            {
+                var stores =
+                    await unitOfWork.StoreRepository.GetCustomerOfStoreAsync(storeId);
+                var storeDtos = mapper.Map<List<UserDto>>(stores);
+                return BaseResponseDto<List<UserDto>>.Success(storeDtos);
+            }
+            catch (Exception ex)
+            {
+                return BaseResponseDto<List<UserDto>>.Failure(
+                    "An error occurred while retrieving customer stores");
+            }
+        }
+
+        //public async Task<BaseResponseDto<IEnumerable<UserDto>>> GetAllCustomerAsync(string storeId)
+        //{
+        //    try
+        //    {
+        //        var stores =  unitOfWork.UserRepository.GetAllAsync().Result.Where(c => c.IsActive == true);
+        //        var storeDtos = mapper.Map<IEnumerable<StoreDto>>(stores);
+        //        return BaseResponseDto<IEnumerable<UserDto>>.Success(storeDtos);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        logger.LogError(ex, "Error getting all stores");
+        //        return BaseResponseDto<IEnumerable<StoreDto>>.Failure("An error occurred while retrieving stores");
+        //    }
+        //}
     }
 }

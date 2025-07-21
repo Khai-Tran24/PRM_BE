@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace BE_SaleHunter.Core.Entities
@@ -35,12 +36,15 @@ namespace BE_SaleHunter.Core.Entities
         public string? PasswordResetToken { get; set; }
         public DateTime? PasswordResetTokenExpiry { get; set; }        
         public long? StoreId { get; set; }
+        [Required]
+        public string Role { get; set; } = string.Empty ;
 
         // Navigation properties
         public virtual Store? Store { get; set; }
         public virtual ICollection<ProductRating> ProductRatings { get; set; } = new List<ProductRating>();
         public virtual ICollection<UserFavorite> Favorites { get; set; } = new List<UserFavorite>();
         public virtual ICollection<ProductView> ProductViews { get; set; } = new List<ProductView>();
+        public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
 
         // Helper methods
         public bool HasStore() => StoreId.HasValue && StoreId.Value > 0;

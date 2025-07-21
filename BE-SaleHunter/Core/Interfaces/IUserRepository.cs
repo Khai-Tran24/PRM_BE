@@ -1,4 +1,5 @@
 using BE_SaleHunter.Core.Entities;
+using System.Linq.Expressions;
 
 namespace BE_SaleHunter.Core.Interfaces
 {    public interface IUserRepository : IGenericRepository<User>
@@ -10,5 +11,7 @@ namespace BE_SaleHunter.Core.Interfaces
         Task<bool> EmailExistsAsync(string email);
         Task<User?> GetUserWithFavoritesAsync(long userId);
         Task<User?> GetUserWithViewHistoryAsync(long userId);
+        Task<int> CountAsync(Expression<Func<User, bool>> predicate);
+
     }
 }

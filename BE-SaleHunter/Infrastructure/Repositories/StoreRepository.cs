@@ -1,3 +1,4 @@
+using BE_SaleHunter.Application.DTOs;
 using BE_SaleHunter.Core.Entities;
 using BE_SaleHunter.Core.Interfaces;
 using BE_SaleHunter.Infrastructure.Data;
@@ -5,29 +6,38 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace BE_SaleHunter.Infrastructure.Repositories
-{    public class StoreRepository : GenericRepository<Store>, IStoreRepository
+{
+    public class StoreRepository : GenericRepository<Store>, IStoreRepository
     {
         private new readonly ILogger<StoreRepository> _logger;
 
-        public StoreRepository(SaleHunterDbContext context, ILogger<StoreRepository> logger, ILogger<GenericRepository<Store>> genericLogger) : base(context, genericLogger)
+        public StoreRepository(SaleHunterDbContext context, ILogger<StoreRepository> logger,
+            ILogger<GenericRepository<Store>> genericLogger) : base(context, genericLogger)
         {
             _logger = logger;
         }
 
         public async Task<Store?> GetStoreWithProductsAsync(long storeId, int page = 1, int pageSize = 20)
         {
-            _logger.LogDebug("REPOSITORY LAYER - GetStoreWithProductsAsync called for StoreId: {StoreId}, Page: {Page}, PageSize: {PageSize}", 
+            _logger.LogDebug(
+                "REPOSITORY LAYER - GetStoreWithProductsAsync called for StoreId: {StoreId}, Page: {Page}, PageSize: {PageSize}",
                 storeId, page, pageSize);
 
-            var store = await _dbSet
+            var store = await DbSet
                 .Include(s => s.User)
+                // .Include(s => s.Products)
+                //     .ThenInclude(p => p.Images)
+                // .Include(s => s.Products)
+                //     .ThenInclude(p => p.Ratings)
+                // .Include(s => s.Products)
+                //     .ThenInclude(p => p.PriceHistory)
                 .FirstOrDefaultAsync(s => s.Id == storeId);
 
             if (store != null)
             {
                 _logger.LogDebug("Store found, loading products for StoreId: {StoreId}", storeId);
                 // Load products with pagination
-                var products = await _context.Products
+                var products = await Context.Products
                     .Where(p => p.StoreId == storeId)
                     .Include(p => p.Images)
                     .Include(p => p.Ratings)
@@ -47,18 +57,20 @@ namespace BE_SaleHunter.Infrastructure.Repositories
             }
 
             return store;
-        }        public async Task<Store?> GetByUserIdAsync(long userId)
+        }
+
+        public async Task<Store?> GetByUserIdAsync(long userId)
         {
             _logger.LogDebug("REPOSITORY LAYER - GetByUserIdAsync called for UserId: {UserId}", userId);
 
-            var store = await _dbSet
+            var store = await DbSet
                 .Include(s => s.Products)
-                    .ThenInclude(p => p.Images)
+                .ThenInclude(p => p.Images)
                 .FirstOrDefaultAsync(s => s.UserId == userId);
 
             if (store != null)
             {
-                _logger.LogDebug("Store found for UserId: {UserId}, StoreId: {StoreId}, StoreName: {StoreName}", 
+                _logger.LogDebug("Store found for UserId: {UserId}, StoreId: {StoreId}, StoreName: {StoreName}",
                     userId, store.Id, store.Name);
             }
             else
@@ -69,17 +81,18 @@ namespace BE_SaleHunter.Infrastructure.Repositories
             return store;
         }
 
-        public async Task<IEnumerable<Store>> GetStoresByLocationAsync(decimal latitude, decimal longitude, double radiusKm)
+        public async Task<IEnumerable<Store>> GetStoresByLocationAsync(decimal latitude, decimal longitude,
+            double radiusKm)
         {
             // Simple distance calculation using Haversine formula approximation
             // For more precise calculations, consider using PostGIS or similar extensions
-            var stores = await _dbSet
+            var stores = await DbSet
                 .Where(s => s.Latitude.HasValue && s.Longitude.HasValue)
                 .ToListAsync();
 
             return stores.Where(s =>
             {
-                var distance = CalculateDistance((double)latitude, (double)longitude, 
+                var distance = CalculateDistance((double)latitude, (double)longitude,
                     (double)s.Latitude!, (double)s.Longitude!);
                 return distance <= radiusKm;
             });
@@ -87,18 +100,18 @@ namespace BE_SaleHunter.Infrastructure.Repositories
 
         public async Task<IEnumerable<Store>> SearchStoresAsync(string searchTerm)
         {
-            return await _dbSet
-                .Where(s => s.Name.Contains(searchTerm) || 
-                           s.Category.Contains(searchTerm) ||
-                           (s.Description != null && s.Description.Contains(searchTerm)))
+            return await DbSet
+                .Where(s => s.Name.Contains(searchTerm) ||
+                            s.Category.Contains(searchTerm) ||
+                            (s.Description != null && s.Description.Contains(searchTerm)))
                 .Include(s => s.Products.Take(5))
-                    .ThenInclude(p => p.Images)
+                .ThenInclude(p => p.Images)
                 .ToListAsync();
         }
 
         public async Task<bool> UserHasStoreAsync(long userId)
         {
-            return await _dbSet.AnyAsync(s => s.UserId == userId);
+            return await DbSet.AnyAsync(s => s.UserId == userId);
         }
 
         private static double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
@@ -120,6 +133,16 @@ namespace BE_SaleHunter.Infrastructure.Repositories
         private static double ToRadians(double degrees)
         {
             return degrees * Math.PI / 180;
+        }
+
+        public async Task<List<User>> GetCustomerOfStoreAsync(long storeId)
+        {
+            return await Context.Orders
+                .Where(o => o.OrderDetails.Any(od => od.Product.StoreId == storeId))
+                .Select(o => o.User)
+                .Distinct()
+                .ToListAsync();
+
         }
     }
 }

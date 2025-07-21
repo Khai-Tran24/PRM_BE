@@ -7,10 +7,17 @@ namespace BE_SaleHunter.Core.Interfaces
         Task<Product?> GetByIdWithAllDetailsAsync(long productId);
         Task<Product?> GetByIdWithStoreAsync(long productId);
         Task<IEnumerable<Product>> GetByStoreIdAsync(long storeId);
-        Task<IEnumerable<Product>> SearchProductsAsync(string query, long? storeId = null, 
-            string? category = null, decimal? minPrice = null, decimal? maxPrice = null);
+        Task<IEnumerable<Product>> SearchProductsAsync(
+            int page, int size,
+            string query, long? storeId = null, 
+            string? category = null, decimal? minPrice = null, decimal? maxPrice = null,
+            string? sortBy = "popularity", string? brand = null);
         Task<IEnumerable<Product>> GetActiveProductsAsync();
         Task<IEnumerable<string>> GetDistinctCategoriesAsync();
         Task<IEnumerable<string>> GetDistinctBrandsAsync();
+        Task<IEnumerable<Product>> GetRecentProductsAsync(int count);
+        Task<IEnumerable<Product>> GetProductsByStoreIdsAsync(IEnumerable<long> storeIds, int count);
+        Task<IEnumerable<Product>> GetOnSaleProductsAsync(int count);
+        Task<IEnumerable<Product>> GetAllProductsWithDetailAsync();
     }
 }

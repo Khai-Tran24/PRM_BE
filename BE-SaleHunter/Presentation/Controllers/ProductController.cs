@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using BE_SaleHunter.Application.Services;
 using BE_SaleHunter.Application.DTOs;
 using System.Security.Claims;
+using BE_SaleHunter.Application.DTOs.Product;
 
 namespace BE_SaleHunter.Presentation.Controllers
 {
@@ -24,7 +25,8 @@ namespace BE_SaleHunter.Presentation.Controllers
         /// </summary>
         [HttpPost]
         [Authorize]
-        public async Task<ActionResult<BaseResponseDto<ProductDto>>> CreateProduct([FromBody] CreateProductDto createProductDto)
+        public async Task<ActionResult<BaseResponseDto<ProductDto>>> CreateProduct(
+            [FromBody] CreateProductDto createProductDto)
         {
             try
             {
@@ -35,11 +37,11 @@ namespace BE_SaleHunter.Presentation.Controllers
                 }
 
                 var result = await _productService.CreateProductAsync(createProductDto, userId.Value);
-                  if (result.IsSuccess)
+                if (result.IsSuccess)
                 {
                     return CreatedAtAction(nameof(GetProduct), new { id = result.Data?.Id }, result);
                 }
-                
+
                 return BadRequest(result);
             }
             catch (Exception ex)
@@ -58,19 +60,35 @@ namespace BE_SaleHunter.Presentation.Controllers
             try
             {
                 var result = await _productService.GetProductByIdAsync(id);
-                
+
                 if (result.IsSuccess)
                 {
-                    // Record product view if user is authenticated
+                    // Record product view if user is authenticated (fire-and-forget)
                     var userId = GetCurrentUserId();
                     if (userId.HasValue)
                     {
-                        _ = Task.Run(async () => await _productService.AddProductViewAsync(id, userId.Value));
+                        // Use Task.Factory.StartNew with TaskCreationOptions.LongRunning
+                        // to avoid blocking the thread pool and create a new scope
+                        _ = Task.Factory.StartNew(async () =>
+                        {
+                            try
+                            {
+                                using var scope = HttpContext.RequestServices.CreateScope();
+                                var productService = scope.ServiceProvider.GetRequiredService<IProductService>();
+                                await productService.AddProductViewAsync(id, userId.Value);
+                            }
+                            catch (Exception ex)
+                            {
+                                // Log error but don't throw to avoid unhandled exceptions
+                                var logger = HttpContext.RequestServices.GetService<ILogger<ProductController>>();
+                                logger?.LogError(ex, "Error recording product view in background task");
+                            }
+                        }, TaskCreationOptions.LongRunning).Unwrap();
                     }
-                    
+
                     return Ok(result);
                 }
-                
+
                 return NotFound(result);
             }
             catch (Exception ex)
@@ -85,7 +103,8 @@ namespace BE_SaleHunter.Presentation.Controllers
         /// </summary>
         [HttpPut("{id}")]
         [Authorize]
-        public async Task<ActionResult<BaseResponseDto<ProductDto>>> UpdateProduct(long id, [FromBody] UpdateProductDto updateProductDto)
+        public async Task<ActionResult<BaseResponseDto<ProductDto>>> UpdateProduct(long id,
+            [FromBody] UpdateProductDto updateProductDto)
         {
             try
             {
@@ -96,12 +115,12 @@ namespace BE_SaleHunter.Presentation.Controllers
                 }
 
                 var result = await _productService.UpdateProductAsync(id, updateProductDto, userId.Value);
-                
+
                 if (result.IsSuccess)
                 {
                     return Ok(result);
                 }
-                
+
                 return BadRequest(result);
             }
             catch (Exception ex)
@@ -127,12 +146,12 @@ namespace BE_SaleHunter.Presentation.Controllers
                 }
 
                 var result = await _productService.DeleteProductAsync(id, userId.Value);
-                
+
                 if (result.IsSuccess)
                 {
                     return Ok(result);
                 }
-                
+
                 return BadRequest(result);
             }
             catch (Exception ex)
@@ -151,12 +170,12 @@ namespace BE_SaleHunter.Presentation.Controllers
             try
             {
                 var result = await _productService.GetProductsByStoreIdAsync(storeId);
-                
+
                 if (result.IsSuccess)
                 {
                     return Ok(result);
                 }
-                
+
                 return BadRequest(result);
             }
             catch (Exception ex)
@@ -167,25 +186,46 @@ namespace BE_SaleHunter.Presentation.Controllers
         }
 
         /// <summary>
-        /// Search products with filters
+        /// Search products with filters and sorting
         /// </summary>
         [HttpGet("search")]
         public async Task<ActionResult<BaseResponseDto<IEnumerable<ProductDto>>>> SearchProducts(
-            [FromQuery] string query,
+            [FromQuery] int size,
+            [FromQuery] int page,
+            [FromQuery] string? query,
             [FromQuery] long? storeId = null,
             [FromQuery] string? category = null,
             [FromQuery] decimal? minPrice = null,
-            [FromQuery] decimal? maxPrice = null)
+            [FromQuery] decimal? maxPrice = null,
+            [FromQuery] string? sortBy = "popularity",
+            [FromQuery] string? brand = null
+        )
         {
             try
             {
-                var result = await _productService.SearchProductsAsync(query, storeId, category, minPrice, maxPrice);
-                
+                var pagingRequest = new PagingRequestDto()
+                {
+                    Size = size > 0 ? size : 10, // Default to 10 if size is less than or equal to 0
+                    Page = page >= 0 ? page : 0 // Default to 0 if page is less than 0
+                };
+                var searchRequest = new ProductSearchRequestDto()
+                {
+                    Query = query,
+                    StoreId = storeId,
+                    Category = category,
+                    MinPrice = minPrice,
+                    MaxPrice = maxPrice,
+                    SortBy = sortBy ?? "popularity",
+                    Brand = brand
+                };
+                var result = await _productService.SearchProductsAsync(
+                    searchRequest, pagingRequest);
+
                 if (result.IsSuccess)
                 {
                     return Ok(result);
                 }
-                
+
                 return BadRequest(result);
             }
             catch (Exception ex)
@@ -211,12 +251,12 @@ namespace BE_SaleHunter.Presentation.Controllers
                 }
 
                 var result = await _productService.GetFavoriteProductsAsync(userId.Value);
-                
+
                 if (result.IsSuccess)
                 {
                     return Ok(result);
                 }
-                
+
                 return BadRequest(result);
             }
             catch (Exception ex)
@@ -242,12 +282,12 @@ namespace BE_SaleHunter.Presentation.Controllers
                 }
 
                 var result = await _productService.AddToFavoritesAsync(id, userId.Value);
-                
+
                 if (result.IsSuccess)
                 {
                     return Ok(result);
                 }
-                
+
                 return BadRequest(result);
             }
             catch (Exception ex)
@@ -273,12 +313,12 @@ namespace BE_SaleHunter.Presentation.Controllers
                 }
 
                 var result = await _productService.RemoveFromFavoritesAsync(id, userId.Value);
-                
+
                 if (result.IsSuccess)
                 {
                     return Ok(result);
                 }
-                
+
                 return BadRequest(result);
             }
             catch (Exception ex)
@@ -304,12 +344,12 @@ namespace BE_SaleHunter.Presentation.Controllers
                 }
 
                 var result = await _productService.GetViewHistoryAsync(userId.Value);
-                
+
                 if (result.IsSuccess)
                 {
                     return Ok(result);
                 }
-                
+
                 return BadRequest(result);
             }
             catch (Exception ex)
@@ -324,7 +364,8 @@ namespace BE_SaleHunter.Presentation.Controllers
         /// </summary>
         [HttpPost("{id}/rating")]
         [Authorize]
-        public async Task<ActionResult<BaseResponseDto<bool>>> AddRating(long id, [FromBody] CreateProductRatingDto ratingDto)
+        public async Task<ActionResult<BaseResponseDto<bool>>> AddRating(long id,
+            [FromBody] CreateProductRatingDto ratingDto)
         {
             try
             {
@@ -335,12 +376,12 @@ namespace BE_SaleHunter.Presentation.Controllers
                 }
 
                 var result = await _productService.AddProductRatingAsync(id, userId.Value, ratingDto);
-                
+
                 if (result.IsSuccess)
                 {
                     return Ok(result);
                 }
-                
+
                 return BadRequest(result);
             }
             catch (Exception ex)
@@ -359,18 +400,73 @@ namespace BE_SaleHunter.Presentation.Controllers
             try
             {
                 var result = await _productService.GetProductRatingsAsync(id);
-                
+
                 if (result.IsSuccess)
                 {
                     return Ok(result);
                 }
-                
+
                 return BadRequest(result);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting product ratings: {ProductId}", id);
                 return StatusCode(500, BaseResponseDto<IEnumerable<ProductRatingDto>>.Failure("Internal server error"));
+            }
+        }
+
+        /// <summary>
+        /// Get recommended products for user
+        /// </summary>
+        [HttpGet("recommended")]
+        [Authorize]
+        public async Task<ActionResult<BaseResponseDto<IEnumerable<ProductDto>>>> GetRecommendedProducts()
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    return BadRequest(BaseResponseDto<IEnumerable<ProductDto>>.Failure("Invalid user"));
+                }
+
+                var result = await _productService.GetRecommendedProductsAsync(userId.Value);
+
+                if (result.IsSuccess)
+                {
+                    return Ok(result);
+                }
+
+                return BadRequest(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting recommended products");
+                return StatusCode(500, BaseResponseDto<IEnumerable<ProductDto>>.Failure("Internal server error"));
+            }
+        }
+
+        /// <summary>
+        /// Get products currently on sale
+        /// </summary>
+        [HttpGet("on-sale")]
+        public async Task<ActionResult<BaseResponseDto<IEnumerable<ProductDto>>>> GetOnSaleProducts()
+        {
+            try
+            {
+                var result = await _productService.GetOnSaleProductsAsync();
+
+                if (result.IsSuccess)
+                {
+                    return Ok(result);
+                }
+
+                return BadRequest(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting on-sale products");
+                return StatusCode(500, BaseResponseDto<IEnumerable<ProductDto>>.Failure("Internal server error"));
             }
         }
 
@@ -381,6 +477,7 @@ namespace BE_SaleHunter.Presentation.Controllers
             {
                 return userId;
             }
+
             return null;
         }
     }

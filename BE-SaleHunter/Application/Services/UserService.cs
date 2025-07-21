@@ -1,6 +1,8 @@
 using AutoMapper;
-using BE_SaleHunter.Core.Interfaces;
 using BE_SaleHunter.Application.DTOs;
+using BE_SaleHunter.Application.DTOs.Store;
+using BE_SaleHunter.Core.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace BE_SaleHunter.Application.Services
 {
@@ -12,6 +14,7 @@ namespace BE_SaleHunter.Application.Services
         Task<BaseResponseDto<bool>> DeactivateUserAsync(long userId);
         Task<BaseResponseDto<bool>> ActivateUserAsync(long userId);
         Task<BaseResponseDto<UserDto>> GetUserProfileAsync(long userId);
+        Task<BaseResponseDto<CustomerAnalyticsDto>> GetCustomerAnalyticsAsync();
     }
 
     public class UserService(
@@ -40,7 +43,34 @@ namespace BE_SaleHunter.Application.Services
                 return BaseResponseDto<UserDto>.Failure("An error occurred while retrieving user");
             }
         }
+        public async Task<BaseResponseDto<CustomerAnalyticsDto>> GetCustomerAnalyticsAsync()
+        {
+            try
+            {
+                var totalCustomers = await unitOfWork.UserRepository.CountAsync(c => true);
 
+                var activeCustomers = await unitOfWork.UserRepository.CountAsync(c => c.IsActive);
+
+
+                var startOfMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+
+                var newCustomersThisMonth = await unitOfWork.UserRepository.CountAsync(c => c.CreatedAt >= startOfMonth);
+
+
+                var analytics = new CustomerAnalyticsDto
+                {
+                    TotalCustomers = totalCustomers,
+                    ActiveCustomers = activeCustomers,
+                    NewCustomersThisMonth = newCustomersThisMonth
+                };
+
+                return BaseResponseDto<CustomerAnalyticsDto>.Success(analytics);
+            }
+            catch (Exception ex)
+            {
+                return BaseResponseDto<CustomerAnalyticsDto>.Failure(ex.Message);
+            }
+        }
         public async Task<BaseResponseDto<UserDto>> UpdateUserAsync(long userId, UpdateUserDto updateUserDto)
         {
             try
