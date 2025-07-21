@@ -9,7 +9,8 @@ namespace BE_SaleHunter.Infrastructure.Repositories
 {
     public class UserRepository : GenericRepository<User>, IUserRepository
     {
-        public UserRepository(SaleHunterDbContext context, ILogger<GenericRepository<User>> logger) : base(context, logger)
+        public UserRepository(SaleHunterDbContext context, ILogger<GenericRepository<User>> logger) : base(context,
+            logger)
         {
         }
 
@@ -29,19 +30,26 @@ namespace BE_SaleHunter.Infrastructure.Repositories
         {
             return await DbSet.AnyAsync(u => u.Email == email);
         }
-        public async Task<int> CountAsync(Expression<Func<User, bool>> predicate)
+
+        public override async Task<int> CountAsync(Expression<Func<User, bool>>? predicate = null)
         {
+            if (predicate == null)
+            {
+                return await DbSet.CountAsync();
+            }
+
             return await DbSet.Where(predicate).CountAsync();
         }
+
         public async Task<User?> GetUserWithFavoritesAsync(long userId)
         {
             return await DbSet
                 .Include(u => u.Favorites)
-                    .ThenInclude(f => f.Product)
-                        .ThenInclude(p => p.Images)
+                .ThenInclude(f => f.Product)
+                .ThenInclude(p => p.Images)
                 .Include(u => u.Favorites)
-                    .ThenInclude(f => f.Product)
-                        .ThenInclude(p => p.Store)
+                .ThenInclude(f => f.Product)
+                .ThenInclude(p => p.Store)
                 .FirstOrDefaultAsync(u => u.Id == userId);
         }
 
@@ -49,10 +57,10 @@ namespace BE_SaleHunter.Infrastructure.Repositories
         {
             return await DbSet
                 .Include(u => u.ProductViews)
-                    .ThenInclude(pv => pv.Product)
-                        .ThenInclude(p => p.Images)                .Include(u => u.ProductViews)
-                    .ThenInclude(pv => pv.Product)
-                        .ThenInclude(p => p.Store)
+                .ThenInclude(pv => pv.Product)
+                .ThenInclude(p => p.Images).Include(u => u.ProductViews)
+                .ThenInclude(pv => pv.Product)
+                .ThenInclude(p => p.Store)
                 .FirstOrDefaultAsync(u => u.Id == userId);
         }
 

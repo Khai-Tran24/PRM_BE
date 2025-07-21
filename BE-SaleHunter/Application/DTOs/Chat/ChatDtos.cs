@@ -5,6 +5,7 @@ namespace BE_SaleHunter.Application.DTOs.Chat
         public long Id { get; set; }
         public string Content { get; set; } = string.Empty;
         public bool IsUserMessage { get; set; }
+        public string AiThinking { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
     }
 

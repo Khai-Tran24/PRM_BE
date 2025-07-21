@@ -19,5 +19,6 @@ namespace BE_SaleHunter.Core.Interfaces
         Task<IEnumerable<Product>> GetProductsByStoreIdsAsync(IEnumerable<long> storeIds, int count);
         Task<IEnumerable<Product>> GetOnSaleProductsAsync(int count);
         Task<IEnumerable<Product>> GetAllProductsWithDetailAsync();
+        Task<int> GetTotalViewsForProducts(List<long> productIds);
     }
 }

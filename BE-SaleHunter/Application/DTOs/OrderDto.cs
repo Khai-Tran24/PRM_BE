@@ -10,8 +10,8 @@ namespace BE_SaleHunter.Application.DTOs
         public string? Status { get; set; }
         public string? ShipName { get; set; }
         public int? TotalPrice { get; set; }
-        public UserDto User { get; set; }
-        public List<OrderDetailDto> OrderDetail { get; set; }
+        public required UserDto User { get; set; }
+        public List<OrderDetailDto> OrderDetail { get; set; } = [];
     }
     public class OrderDetailDto
     {

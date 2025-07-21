@@ -3,6 +3,7 @@ using BE_SaleHunter.Application.Services;
 using BE_SaleHunter.Application.Validators;
 using BE_SaleHunter.Core.Entities;
 using BE_SaleHunter.Core.Interfaces;
+using BE_SaleHunter.Core.Configuration;
 using BE_SaleHunter.Infrastructure.Data;
 using BE_SaleHunter.Infrastructure.Logging;
 using BE_SaleHunter.Infrastructure.Middleware;
@@ -152,6 +153,31 @@ Log.Information("SERVICE REGISTRATION - AutoMapper configured with MappingProfil
 // Configure FluentValidation
 builder.Services.AddValidatorsFromAssembly(typeof(CreateProductValidator).Assembly);
 Log.Information("SERVICE REGISTRATION - FluentValidation configured");
+
+// Configure Ollama settings
+builder.Services.Configure<OllamaConfiguration>(
+    builder.Configuration.GetSection(OllamaConfiguration.SectionName));
+
+// Validate Ollama configuration
+var ollamaConfig = builder.Configuration.GetSection(OllamaConfiguration.SectionName).Get<OllamaConfiguration>();
+if (ollamaConfig != null)
+{
+    try
+    {
+        ollamaConfig.Validate();
+        Log.Information("SERVICE REGISTRATION - Ollama configuration validated (Endpoint: {Endpoint}, Model: {Model})", 
+            ollamaConfig.Endpoint, ollamaConfig.DefaultModel);
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Invalid Ollama configuration");
+        throw;
+    }
+}
+else
+{
+    Log.Warning("Ollama configuration section not found, using default values");
+}
 
 // Configure Identity for password hashing
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();

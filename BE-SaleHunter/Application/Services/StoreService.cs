@@ -17,13 +17,11 @@ namespace BE_SaleHunter.Application.Services
         Task<BaseResponseDto<StoreDto>> UpdateStoreAsync(long storeId, UpdateStoreDto updateStoreDto, long userId);
         Task<BaseResponseDto<bool>> DeleteStoreAsync(long storeId, long userId);
         Task<BaseResponseDto<IEnumerable<StoreDto>>> GetAllStoresAsync();
-        //Task<BaseResponseDto<IEnumerable<UserDto>>> GetAllCustomerAsync(string storeId);
-
         Task<BaseResponseDto<IEnumerable<StoreDto>>> SearchStoresAsync(string query, decimal? latitude = null,
             decimal? longitude = null, double? radiusKm = null);
-
         Task<BaseResponseDto<IEnumerable<StoreDto>>> GetNearbyStoresAsync(decimal latitude, decimal longitude,
             double radiusKm = 10);
+        Task<BaseResponseDto<SellerDashboardDto>> GetDashboardAsync(long userId);
     }
 
     public class StoreService(
@@ -382,19 +380,43 @@ namespace BE_SaleHunter.Application.Services
             }
         }
 
-        //public async Task<BaseResponseDto<IEnumerable<UserDto>>> GetAllCustomerAsync(string storeId)
-        //{
-        //    try
-        //    {
-        //        var stores =  unitOfWork.UserRepository.GetAllAsync().Result.Where(c => c.IsActive == true);
-        //        var storeDtos = mapper.Map<IEnumerable<StoreDto>>(stores);
-        //        return BaseResponseDto<IEnumerable<UserDto>>.Success(storeDtos);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        logger.LogError(ex, "Error getting all stores");
-        //        return BaseResponseDto<IEnumerable<StoreDto>>.Failure("An error occurred while retrieving stores");
-        //    }
-        //}
+        public async Task<BaseResponseDto<SellerDashboardDto>> GetDashboardAsync(long userId)
+        {
+            try
+            {
+                var store = await unitOfWork.StoreRepository.GetByUserIdAsync(userId);
+                if (store == null)
+                {
+                    return BaseResponseDto<SellerDashboardDto>.Failure("Store not found for this user");
+                }
+
+                var products = await unitOfWork.ProductRepository.GetByStoreIdAsync(store.Id);
+                var productIds = products.Select(p => p.Id).ToList();
+                var totalViews = await unitOfWork.ProductRepository.GetTotalViewsForProducts(productIds);
+
+                var dashboardDto = new SellerDashboardDto
+                {
+                    Stats = new DashboardStatsDto
+                    {
+                        TotalProducts = products.Count(),
+                        TotalViews = totalViews,
+                        TotalOrders = 0, // Placeholder
+                        TotalCustomers = 0 // Placeholder
+                    },
+                    CategoryDistribution = products
+                        .GroupBy(p => p.Category)
+                        .Select(g => new CategoryDistributionDto { Name = g.Key, Value = g.Count() })
+                        .ToList(),
+                    SalesByMonth = new List<MonthlySalesDto>() // Placeholder
+                };
+
+                return BaseResponseDto<SellerDashboardDto>.Success(dashboardDto);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error getting dashboard data for user: {UserId}", userId);
+                return BaseResponseDto<SellerDashboardDto>.Failure("An error occurred while retrieving dashboard data");
+            }
+        }
     }
 }

@@ -1,10 +1,7 @@
-﻿using Azure;
-using BE_SaleHunter.Application.DTOs;
+﻿using BE_SaleHunter.Application.DTOs;
 using BE_SaleHunter.Application.DTOs.Order;
 using BE_SaleHunter.Application.DTOs.Payment;
 using BE_SaleHunter.Application.Services;
-using BE_SaleHunter.Core.Entities;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Net.payOS;
@@ -21,13 +18,16 @@ namespace BE_SaleHunter.Presentation.Controllers
         private readonly IOrderService _orderService;
         private readonly IMemoryCache _memoryCache;
         private readonly ILogger<ProductController> _logger;
-        public OrderController(IOrderService orderService, ILogger<ProductController> logger, PayOS payOS, IMemoryCache memoryCache)
+
+        public OrderController(IOrderService orderService, ILogger<ProductController> logger, PayOS payOS,
+            IMemoryCache memoryCache)
         {
             _orderService = orderService;
             _memoryCache = memoryCache;
             _payOS = payOS;
             _logger = logger;
         }
+
         /// <summary>
         /// tạo đơn hàng mới
         /// </summary>
@@ -43,12 +43,14 @@ namespace BE_SaleHunter.Presentation.Controllers
                 int totalPrice = 0;
                 foreach (var CartItemDTO in body.order.Items)
                 {
-                    ItemData item = new ItemData(CartItemDTO.ProductName, CartItemDTO.Quantity, CartItemDTO.Quantity * (int)CartItemDTO.Price);
+                    ItemData item = new ItemData(CartItemDTO.ProductName, CartItemDTO.Quantity,
+                        CartItemDTO.Quantity * (int)CartItemDTO.Price);
                     totalPrice += CartItemDTO.Quantity * (int)CartItemDTO.Price;
                     items.Add(item);
                 }
 
-                PaymentData paymentData = new PaymentData(orderCode, totalPrice, body.description, items, body.cancelUrl, body.returnUrl);
+                PaymentData paymentData = new PaymentData(orderCode, totalPrice, body.description, items,
+                    body.cancelUrl, body.returnUrl);
 
                 CreatePaymentResult createPayment = await _payOS.createPaymentLink(paymentData);
                 string cacheKey = $"{orderCode}";
@@ -62,6 +64,7 @@ namespace BE_SaleHunter.Presentation.Controllers
                 return Ok(BaseResponseDto<CreatePaymentResult>.Success(null, "fail"));
             }
         }
+
         [HttpGet("{orderId}")]
         public async Task<IActionResult> GetOrder([FromRoute] int orderId)
         {
@@ -72,30 +75,29 @@ namespace BE_SaleHunter.Presentation.Controllers
             }
             catch (System.Exception exception)
             {
-
                 Console.WriteLine(exception);
                 return Ok(BaseResponseDto<PaymentLinkInformation>.Success("fail"));
             }
-
         }
-        [HttpPut("{orderId}")]
+
+        [HttpPut("cancel/{orderId}")]
         public async Task<IActionResult> CancelOrder([FromRoute] int orderId)
         {
             try
             {
                 PaymentLinkInformation paymentLinkInformation = await _payOS.cancelPaymentLink(orderId);
-                return Ok(BaseResponseDto<PaymentLinkInformation>.Success(paymentLinkInformation, "success")); ;
+                return Ok(BaseResponseDto<PaymentLinkInformation>.Success(paymentLinkInformation, "success"));
+                ;
             }
             catch (System.Exception exception)
             {
-
                 Console.WriteLine(exception);
                 return Ok(BaseResponseDto<PaymentLinkInformation>.Success(null, "fail"));
             }
-
         }
+
         [HttpPost("confirm-webhook")]
-        public async Task<IActionResult> ConfirmWebhook(ConfirmWebhook  body)
+        public async Task<IActionResult> ConfirmWebhook(ConfirmWebhook body)
         {
             try
             {
@@ -104,12 +106,11 @@ namespace BE_SaleHunter.Presentation.Controllers
             }
             catch (System.Exception exception)
             {
-
                 Console.WriteLine(exception);
                 return Ok(BaseResponseDto<PaymentLinkInformation>.Success(null, "fail"));
             }
-
         }
+
         /// <summary>
         /// Update order status
         /// </summary>
@@ -117,7 +118,8 @@ namespace BE_SaleHunter.Presentation.Controllers
         /// <param name="updateOrderDto"></param>
         /// <returns></returns>
         [HttpPut("{id}")]
-        public async Task<ActionResult<BaseResponseDto<OrderDto>>> UpdateOrder(long id, [FromBody] UpdateOrderDto updateOrderDto)
+        public async Task<ActionResult<BaseResponseDto<OrderDto>>> UpdateOrder(long id,
+            [FromBody] UpdateOrderDto updateOrderDto)
         {
             try
             {
@@ -142,6 +144,7 @@ namespace BE_SaleHunter.Presentation.Controllers
                 return StatusCode(500, BaseResponseDto<ProductDto>.Failure("Internal server error"));
             }
         }
+
         /// <summary>
         /// get all order of store
         /// </summary>
@@ -170,6 +173,7 @@ namespace BE_SaleHunter.Presentation.Controllers
                 return StatusCode(500, BaseResponseDto<ProductDto>.Failure("Internal server error"));
             }
         }
+
         /// <summary>
         /// Get order detail
         /// </summary>
@@ -198,6 +202,7 @@ namespace BE_SaleHunter.Presentation.Controllers
                 return StatusCode(500, BaseResponseDto<OrderDto>.Failure("Internal server error"));
             }
         }
+
         private long? GetCurrentUserId()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -205,6 +210,7 @@ namespace BE_SaleHunter.Presentation.Controllers
             {
                 return userId;
             }
+
             return null;
         }
     }

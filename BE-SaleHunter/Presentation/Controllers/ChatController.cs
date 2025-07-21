@@ -1,9 +1,13 @@
+using System;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using BE_SaleHunter.Application.Services;
 using BE_SaleHunter.Application.DTOs;
 using BE_SaleHunter.Application.DTOs.Chat;
 using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 
 namespace BE_SaleHunter.Presentation.Controllers
 {

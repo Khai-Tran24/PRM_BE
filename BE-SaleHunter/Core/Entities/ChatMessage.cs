@@ -12,6 +12,7 @@ namespace BE_SaleHunter.Core.Entities
         [Required] [DataType("text")] public string Content { get; set; } = string.Empty;
 
         [Required] public bool IsUserMessage { get; set; } // true for user, false for AI
+        [DataType("text")] public string AiThinking { get; set; } = string.Empty;
 
         // Navigation properties
         public virtual ChatConversation ChatConversation { get; set; } = null!;

@@ -191,5 +191,17 @@ namespace BE_SaleHunter.Infrastructure.Repositories
                 .Include(p => p.Favorites)
                 .ToListAsync();
         }
+
+        public async Task<int> GetTotalViewsForProducts(List<long> productIds)
+        {
+            if (productIds == null || !productIds.Any())
+            {
+                return 0;
+            }
+
+            return await Context.ProductViews
+                .Where(v => productIds.Contains(v.ProductId))
+                .CountAsync();
+        }
     }
 }

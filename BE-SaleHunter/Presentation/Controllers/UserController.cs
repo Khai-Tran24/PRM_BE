@@ -191,7 +191,7 @@ namespace BE_SaleHunter.Presentation.Controllers
 
                 if (result.IsSuccess)
                 {
-                    _logger.LogInformation("GetCustomerAnalytics successful - TotalCustomers: {Total}", result.Data.TotalCustomers);
+                    _logger.LogInformation("GetCustomerAnalytics successful - TotalCustomers: {Total}", result.Data?.TotalCustomers ?? -1);
                     return Ok(result);
                 }
 

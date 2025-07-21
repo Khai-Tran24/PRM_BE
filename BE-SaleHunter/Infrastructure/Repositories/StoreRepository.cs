@@ -9,7 +9,7 @@ namespace BE_SaleHunter.Infrastructure.Repositories
 {
     public class StoreRepository : GenericRepository<Store>, IStoreRepository
     {
-        private new readonly ILogger<StoreRepository> _logger;
+        private readonly ILogger<StoreRepository> _logger;
 
         public StoreRepository(SaleHunterDbContext context, ILogger<StoreRepository> logger,
             ILogger<GenericRepository<Store>> genericLogger) : base(context, genericLogger)

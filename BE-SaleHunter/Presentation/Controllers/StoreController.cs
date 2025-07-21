@@ -301,5 +301,36 @@ namespace BE_SaleHunter.Presentation.Controllers
 
             return null;
         }
+
+        /// <summary>
+        /// Get dashboard data for the current user's store
+        /// </summary>
+        [HttpGet("my-store/dashboard")]
+        [Authorize]
+        public async Task<ActionResult<BaseResponseDto<SellerDashboardDto>>> GetMyStoreDashboard()
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (userId == null)
+                {
+                    return BadRequest(BaseResponseDto<SellerDashboardDto>.Failure("Invalid user"));
+                }
+
+                var result = await _storeService.GetDashboardAsync(userId.Value);
+
+                if (result.IsSuccess)
+                {
+                    return Ok(result);
+                }
+
+                return BadRequest(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting user's store dashboard");
+                return StatusCode(500, BaseResponseDto<SellerDashboardDto>.Failure("Internal server error"));
+            }
+        }
     }
 }
